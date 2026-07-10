@@ -54,6 +54,10 @@ createServer(async (req, res) => {
 
     // ---- onboarding ----
     if (req.method === "POST" && p === "/api/onboard") {
+      // Invite-only gate: if a signup code is configured, require a match.
+      if (base.signupCode && String(body.code || "").trim() !== base.signupCode) {
+        return json(res, 403, { error: "That invite code isn't valid. Ask NeverMiss for your code." });
+      }
       const t = tenants.create(body);
       const off = resolveConfig(t).offline;
       const verify = {
@@ -62,7 +66,7 @@ createServer(async (req, res) => {
       };
       return json(res, 200, { tenant: publicTenant(t), verify, consoleUrl: `/?endpoint=/api/console&tenant=${t.id}&name=${encodeURIComponent(t.name)}` });
     }
-    if (req.method === "GET" && p === "/api/config") return json(res, 200, { gmailAvailable: gmailConfigured(base.google) });
+    if (req.method === "GET" && p === "/api/config") return json(res, 200, { gmailAvailable: gmailConfigured(base.google), signupRequired: !!base.signupCode });
     if (req.method === "GET" && p === "/api/tenants") return json(res, 200, tenants.all().map(publicTenant));
 
     // ---- Gmail OAuth ----

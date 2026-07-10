@@ -48,6 +48,12 @@ a.open{display:inline-block;margin-top:16px;background:var(--accent);color:var(-
   <div class="sub">Two minutes. Pick what it can touch, how much runs on its own, and connect your tools. It never sends, pays, or deletes without a human approving.</div>
 
   <form id="form">
+    <div class="card hidden" id="inviteCard">
+      <h2>0 · Invite code</h2>
+      <p class="hint" style="margin:0 0 10px">Copilot is invite-only right now. Enter the code NeverMiss gave you.</p>
+      <input type="text" id="invite" placeholder="Your invite code" autocomplete="off" autocapitalize="characters" />
+    </div>
+
     <div class="card">
       <h2>1 · Your business</h2>
       <input type="text" id="name" placeholder="e.g. Greenline Distribution" required />
@@ -102,6 +108,10 @@ a.open{display:inline-block;margin-top:16px;background:var(--accent);color:var(-
 </div>
 <script>
 const $=(s)=>document.querySelector(s);
+let SIGNUP_REQUIRED=false;
+// If the server is invite-only, reveal the code field up front.
+(async()=>{ try{ const cfg=await (await fetch("/api/config")).json();
+  if(cfg.signupRequired){ SIGNUP_REQUIRED=true; $("#inviteCard").classList.remove("hidden"); } }catch(e){} })();
 // selected-state styling for opt cards
 document.addEventListener("change",(e)=>{
   const o=e.target.closest(".opt"); if(!o)return;
@@ -116,11 +126,14 @@ $("#form").addEventListener("submit",async(ev)=>{
     mode:document.querySelector('input[name="mode"]:checked').value,
     autonomy:document.querySelector('input[name="autonomy"]:checked').value,
     capabilities:caps,
+    code:($("#invite")?.value||"").trim(),
   };
   if(!payload.name){$("#err").textContent="Add your business name.";$("#err").classList.remove("hidden");return;}
+  if(SIGNUP_REQUIRED&&!payload.code){$("#err").textContent="Enter your invite code to continue.";$("#err").classList.remove("hidden");return;}
   const btn=$(".go");btn.disabled=true;btn.textContent="Connecting…";
   try{
     const r=await fetch("/api/onboard",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+    if(r.status===403){const e=await r.json().catch(()=>({}));throw new Error(e.error||"That invite code isn't valid.");}
     if(!r.ok)throw new Error("HTTP "+r.status);
     const d=await r.json();
     const c=d.tenant.connections;
@@ -143,7 +156,7 @@ $("#form").addEventListener("submit",async(ev)=>{
         $("#openConsole").parentNode.insertBefore(g,$("#openConsole")); } }catch(e){}
     $("#form").classList.add("hidden");$("#done").classList.remove("hidden");
     window.scrollTo({top:0,behavior:"smooth"});
-  }catch(e){$("#err").textContent="Couldn't connect: "+e.message;$("#err").classList.remove("hidden");btn.disabled=false;btn.textContent="Connect Copilot →";}
+  }catch(e){const m=/invite|code/i.test(e.message)?e.message:("Couldn't connect: "+e.message);$("#err").textContent=m;$("#err").classList.remove("hidden");btn.disabled=false;btn.textContent="Connect Copilot →";}
 });
 </script>
 </body>

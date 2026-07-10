@@ -43,4 +43,8 @@ export const config = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectBase: process.env.OAUTH_REDIRECT_BASE || `http://localhost:${Number(process.env.COPILOT_PORT || 3300)}`,
   },
+
+  // Invite-only signup gate. If set, POST /api/onboard requires a matching code.
+  // Leave unset for open signup (local/dev); set SIGNUP_CODE in production.
+  signupCode: process.env.SIGNUP_CODE || "",
 };
