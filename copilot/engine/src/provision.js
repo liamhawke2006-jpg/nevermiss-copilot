@@ -54,8 +54,10 @@ export function resolveConfig(tenant) {
     dbPath: `data/tenants/${tenant.id}.json`,
     autonomy: tenant.settings.autonomy,
     capabilities: tenant.settings.capabilities,
-    anthropic: { key: s.anthropicKey || "", model: base.anthropic.model },
-    sendgrid: { key: s.sendgridKey || "", from: s.mailFrom || base.sendgrid.from },
+    // Fall back to the PLATFORM keys (NeverMiss's own env vars) so customers
+    // never bring their own Anthropic/SendGrid key. A tenant can still override.
+    anthropic: { key: s.anthropicKey || base.anthropic.key, model: base.anthropic.model },
+    sendgrid: { key: s.sendgridKey || base.sendgrid.key, from: s.mailFrom || base.sendgrid.from },
     gmail: { refresh: s.gmailRefresh || "", clientId: base.google.clientId, clientSecret: base.google.clientSecret, redirectBase: base.google.redirectBase },
     browserHeadless: true,
   };
@@ -83,8 +85,8 @@ export function connections(tenant) {
   return {
     mode: tenant.mode,
     autonomy: tenant.settings.autonomy,
-    brain: s.anthropicKey ? "connected" : "off",
-    email: s.sendgridKey ? "connected" : "off",
+    brain: (s.anthropicKey || base.anthropic.key) ? "connected" : "off",
+    email: (s.sendgridKey || base.sendgrid.key || s.gmailRefresh) ? "connected" : "off",
     gmail: s.gmailRefresh ? "connected" : "off",
     files: on(c.files), http: on(c.http), browser: on(c.browser), shell: on(c.shell), desktop: on(c.desktop),
   };

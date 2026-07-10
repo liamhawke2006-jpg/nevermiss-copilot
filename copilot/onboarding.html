@@ -78,16 +78,11 @@ a.open{display:inline-block;margin-top:16px;background:var(--accent);color:var(-
     </div>
 
     <div class="card">
-      <h2>4 · Connect your tools</h2>
-      <label>SendGrid API key <span class="hint">— so it can actually send email (no OAuth)</span></label>
-      <input type="password" id="sendgridKey" placeholder="SG.xxxxxxxx" autocomplete="off" />
-      <label>Send email from</label>
-      <input type="email" id="mailFrom" placeholder="copilot@yourbusiness.com" />
-      <label>Anthropic API key <span class="hint">— powers the brain that understands tasks</span></label>
-      <input type="password" id="anthropicKey" placeholder="sk-ant-..." autocomplete="off" />
-      <div class="row" style="margin-top:14px">
-        <label class="opt soon"><span><span class="t">Gmail <span class="tag">OAUTH · SOON</span></span><span class="d">One-click connect when hosted</span></span></label>
-        <label class="opt soon"><span><span class="t">Slack <span class="tag">OAUTH · SOON</span></span><span class="d">One-click connect when hosted</span></span></label>
+      <h2>4 · Connect your email <span style="text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></h2>
+      <p class="hint" style="margin:0 0 12px">The AI is already built in — nothing to set up, no keys, no accounts. If you want it to send email <b>from you</b>, connect Gmail right after signup. Otherwise it sends on your behalf.</p>
+      <div class="row">
+        <label class="opt soon"><span><span class="t">Gmail <span class="tag">CONNECT NEXT</span></span><span class="d">One click, right after signup</span></span></label>
+        <label class="opt soon"><span><span class="t">Slack <span class="tag">SOON</span></span><span class="d">Coming soon</span></span></label>
       </div>
     </div>
 
@@ -121,9 +116,6 @@ $("#form").addEventListener("submit",async(ev)=>{
     mode:document.querySelector('input[name="mode"]:checked').value,
     autonomy:document.querySelector('input[name="autonomy"]:checked').value,
     capabilities:caps,
-    sendgridKey:$("#sendgridKey").value.trim(),
-    mailFrom:$("#mailFrom").value.trim(),
-    anthropicKey:$("#anthropicKey").value.trim(),
   };
   if(!payload.name){$("#err").textContent="Add your business name.";$("#err").classList.remove("hidden");return;}
   const btn=$(".go");btn.disabled=true;btn.textContent="Connecting…";
@@ -137,8 +129,8 @@ $("#form").addEventListener("submit",async(ev)=>{
     $("#checks").innerHTML=[
       line("Mode",c.mode,c.mode==="live"?"LIVE":"demo"),
       line("Approval",c.autonomy,c.autonomy==="auto-safe-hold-world"?"safe-auto / hold-world":c.autonomy),
-      line("Email (SendGrid)",c.email,c.email==="connected"?"✓ "+d.verify.email.detail:"off"),
-      line("Brain (Claude)",c.brain,c.brain==="connected"?"✓ "+d.verify.brain.detail:"off"),
+      line("AI brain",c.brain,c.brain==="connected"?"✓ built in":"off"),
+      line("Email",c.email,c.email==="connected"?"✓ ready":"connect Gmail"),
       line("Files",c.files), line("Web",c.http), line("Browser",c.browser),
     ].join("");
     $("#doneName").textContent=d.tenant.name+" · "+d.tenant.id;
