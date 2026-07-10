@@ -1,0 +1,24 @@
+{
+  "name": "nevermiss-copilot-engine",
+  "version": "0.2.0",
+  "description": "The doer behind NeverMiss Copilot — assign a task in plain English; it plans and executes with a modular tool registry, holds any world-changing action for human approval, and is multi-tenant with self-serve onboarding.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "assign": "node src/cli.js assign",
+    "pending": "node src/cli.js pending",
+    "approve": "node src/cli.js approve",
+    "deny": "node src/cli.js deny",
+    "tasks": "node src/cli.js tasks",
+    "demo": "node src/cli.js demo",
+    "start": "node src/server.js",
+    "test": "node test/all.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+copilot/engine/node_modules/
+copilot/engine/data/
+copilot/engine/workspace/
+**/.env
+*.log

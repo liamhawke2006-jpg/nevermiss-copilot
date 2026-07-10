@@ -1,0 +1,6 @@
+copilot/engine/node_modules
+copilot/engine/data
+copilot/engine/workspace
+**/.env
+**/*.mp4
+.git

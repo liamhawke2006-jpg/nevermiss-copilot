@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Connect Copilot — NeverMiss</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#070C0A;--surface:#0f1714;--surface-2:#141E1A;--line:#22302B;--line-2:#2C3D37;--ink:#F2F6F4;--muted:#7C918A;
+--accent:#38D392;--accent-ink:#062015;--good:#3DDC97;--warn:#D9A946;--bad:#F0A79F;--r:14px;
+--mono:ui-monospace,"JetBrains Mono",Menlo,monospace;--sans:-apple-system,BlinkMacSystemFont,Inter,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:0;background:radial-gradient(900px 600px at 80% -10%,rgba(56,211,146,.12),transparent 60%),radial-gradient(700px 500px at 0% 110%,rgba(56,211,146,.07),transparent 60%)}
+.wrap{position:relative;z-index:1;max-width:640px;margin:0 auto;padding:44px 22px 80px}
+.brand{font:700 12px var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(28px,5vw,40px);letter-spacing:-.02em;margin:10px 0 6px}
+.sub{color:var(--muted);margin-bottom:28px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;margin-bottom:16px}
+.card h2{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 14px}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+input[type=text],input[type=email],input[type=password]{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;color:var(--ink);font:15px var(--sans);padding:12px 14px}
+input::placeholder{color:#5b6f68}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.opt{flex:1;min-width:150px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;background:var(--surface-2)}
+.opt.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.opt input{margin-top:3px}
+.opt .t{font-weight:600;font-size:14px}.opt .d{font-size:12px;color:var(--muted);margin-top:2px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.soon{opacity:.5}.soon .tag{font:700 9px var(--mono);color:var(--warn);border:1px solid rgba(217,169,70,.4);border-radius:5px;padding:2px 6px;margin-left:6px}
+button.go{width:100%;margin-top:8px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:12px;padding:16px;font:800 15px var(--sans);cursor:pointer}
+button.go:disabled{opacity:.5;cursor:default}
+.done{text-align:center;padding:20px}
+.done .big{font-size:44px}
+.checks{text-align:left;margin:18px auto;max-width:360px}
+.chk{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line);font:600 13px var(--mono)}
+.chk .on{color:var(--good)}.chk .off{color:var(--muted)}.chk .bad{color:var(--bad)}
+a.open{display:inline-block;margin-top:16px;background:var(--accent);color:var(--accent-ink);text-decoration:none;font:800 14px var(--sans);padding:14px 26px;border-radius:12px}
+.err{color:var(--bad);font-size:13px;margin-top:10px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">◎ NeverMiss Copilot</div>
+  <h1>Connect Copilot</h1>
+  <div class="sub">Two minutes. Pick what it can touch, how much runs on its own, and connect your tools. It never sends, pays, or deletes without a human approving.</div>
+
+  <form id="form">
+    <div class="card">
+      <h2>1 · Your business</h2>
+      <input type="text" id="name" placeholder="e.g. Greenline Distribution" required />
+      <label>Try it safely first, or go live?</label>
+      <div class="row" id="modeRow">
+        <label class="opt sel"><input type="radio" name="mode" value="demo" checked><span><span class="t">Demo mode</span><span class="d">Simulates actions — nothing real sends. Great to try.</span></span></label>
+        <label class="opt"><input type="radio" name="mode" value="live"><span><span class="t">Go live</span><span class="d">Real actions (still gated by approval).</span></span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2 · What can it do?</h2>
+      <div class="grid" id="caps">
+        <label class="opt sel"><input type="checkbox" name="cap" value="files" checked><span><span class="t">📁 Files</span><span class="d">Read/organize files</span></span></label>
+        <label class="opt sel"><input type="checkbox" name="cap" value="http" checked><span><span class="t">🌐 Web</span><span class="d">Fetch data from URLs</span></span></label>
+        <label class="opt sel"><input type="checkbox" name="cap" value="comms" checked><span><span class="t">✉️ Email</span><span class="d">Draft & send email</span></span></label>
+        <label class="opt sel"><input type="checkbox" name="cap" value="browser" checked><span><span class="t">🧭 Browser</span><span class="d">Click through web apps</span></span></label>
+        <label class="opt"><input type="checkbox" name="cap" value="shell"><span><span class="t">⌘ Shell</span><span class="d">Run scripts (advanced)</span></span></label>
+        <label class="opt"><input type="checkbox" name="cap" value="desktop"><span><span class="t">🖥️ Desktop</span><span class="d">Control apps (soon)</span></span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>3 · How much runs on its own?</h2>
+      <label class="opt sel" style="margin-bottom:8px"><input type="radio" name="autonomy" value="auto-safe-hold-world" checked><span><span class="t">Auto-run safe, hold the rest</span><span class="d">Reads/drafts run free; send/pay/delete/post wait for your OK. Recommended.</span></span></label>
+      <label class="opt" style="margin-bottom:8px"><input type="radio" name="autonomy" value="approve-everything"><span><span class="t">Approve everything</span><span class="d">Every action waits for you. Maximum control.</span></span></label>
+      <label class="opt"><input type="radio" name="autonomy" value="full-auto"><span><span class="t">Fully autonomous</span><span class="d">No gate. Fastest, least safe.</span></span></label>
+    </div>
+
+    <div class="card">
+      <h2>4 · Connect your tools</h2>
+      <label>SendGrid API key <span class="hint">— so it can actually send email (no OAuth)</span></label>
+      <input type="password" id="sendgridKey" placeholder="SG.xxxxxxxx" autocomplete="off" />
+      <label>Send email from</label>
+      <input type="email" id="mailFrom" placeholder="copilot@yourbusiness.com" />
+      <label>Anthropic API key <span class="hint">— powers the brain that understands tasks</span></label>
+      <input type="password" id="anthropicKey" placeholder="sk-ant-..." autocomplete="off" />
+      <div class="row" style="margin-top:14px">
+        <label class="opt soon"><span><span class="t">Gmail <span class="tag">OAUTH · SOON</span></span><span class="d">One-click connect when hosted</span></span></label>
+        <label class="opt soon"><span><span class="t">Slack <span class="tag">OAUTH · SOON</span></span><span class="d">One-click connect when hosted</span></span></label>
+      </div>
+    </div>
+
+    <button class="go" type="submit">Connect Copilot →</button>
+    <div class="err hidden" id="err"></div>
+  </form>
+
+  <div class="card hidden" id="done">
+    <div class="done">
+      <div class="big">✅</div>
+      <h1 style="margin:6px 0">You're connected.</h1>
+      <div class="sub" id="doneName"></div>
+      <div class="checks" id="checks"></div>
+      <a class="open" id="openConsole" href="#">Open your Copilot console →</a>
+    </div>
+  </div>
+</div>
+<script>
+const $=(s)=>document.querySelector(s);
+// selected-state styling for opt cards
+document.addEventListener("change",(e)=>{
+  const o=e.target.closest(".opt"); if(!o)return;
+  if(e.target.type==="radio"){[...e.target.closest(".row,.card,.grid").querySelectorAll('input[name="'+e.target.name+'"]')].forEach(r=>r.closest(".opt").classList.toggle("sel",r.checked));}
+  else{o.classList.toggle("sel",e.target.checked);}
+});
+$("#form").addEventListener("submit",async(ev)=>{
+  ev.preventDefault();
+  const caps={};document.querySelectorAll('input[name="cap"]').forEach(c=>caps[c.value]=c.checked);
+  const payload={
+    name:$("#name").value.trim(),
+    mode:document.querySelector('input[name="mode"]:checked').value,
+    autonomy:document.querySelector('input[name="autonomy"]:checked').value,
+    capabilities:caps,
+    sendgridKey:$("#sendgridKey").value.trim(),
+    mailFrom:$("#mailFrom").value.trim(),
+    anthropicKey:$("#anthropicKey").value.trim(),
+  };
+  if(!payload.name){$("#err").textContent="Add your business name.";$("#err").classList.remove("hidden");return;}
+  const btn=$(".go");btn.disabled=true;btn.textContent="Connecting…";
+  try{
+    const r=await fetch("/api/onboard",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    const c=d.tenant.connections;
+    const line=(label,state,detail)=>{const cls=state==="connected"||state==="on"?"on":(state==="bad"?"bad":"off");
+      return `<div class="chk"><span>${label}</span><span class="${cls}">${detail||state}</span></div>`;};
+    $("#checks").innerHTML=[
+      line("Mode",c.mode,c.mode==="live"?"LIVE":"demo"),
+      line("Approval",c.autonomy,c.autonomy==="auto-safe-hold-world"?"safe-auto / hold-world":c.autonomy),
+      line("Email (SendGrid)",c.email,c.email==="connected"?"✓ "+d.verify.email.detail:"off"),
+      line("Brain (Claude)",c.brain,c.brain==="connected"?"✓ "+d.verify.brain.detail:"off"),
+      line("Files",c.files), line("Web",c.http), line("Browser",c.browser),
+    ].join("");
+    $("#doneName").textContent=d.tenant.name+" · "+d.tenant.id;
+    $("#openConsole").href=d.consoleUrl;
+    // Offer "Connect Gmail" only if the server has Google OAuth configured.
+    try{ const cfg=await (await fetch("/api/config")).json();
+      if(cfg.gmailAvailable){ const g=document.createElement("a"); g.className="open";
+        g.style.cssText="background:var(--surface-2);color:var(--ink);margin-right:10px;box-shadow:inset 0 0 0 1px var(--line)";
+        g.href="/api/oauth/gmail/start?tenant="+d.tenant.id; g.textContent="Connect Gmail →";
+        $("#openConsole").parentNode.insertBefore(g,$("#openConsole")); } }catch(e){}
+    $("#form").classList.add("hidden");$("#done").classList.remove("hidden");
+    window.scrollTo({top:0,behavior:"smooth"});
+  }catch(e){$("#err").textContent="Couldn't connect: "+e.message;$("#err").classList.remove("hidden");btn.disabled=false;btn.textContent="Connect Copilot →";}
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: nevermiss-copilot
+    runtime: docker
+    dockerfilePath: ./copilot/engine/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: COPILOT_OFFLINE
+        value: "0"
+      - key: COPILOT_SECRET_KEY   # encrypts tenant secrets at rest
+        generateValue: true
+      - key: ANTHROPIC_API_KEY    # the brain
+        sync: false
+      - key: OAUTH_REDIRECT_BASE  # e.g. https://copilot.nevermissai.net
+        sync: false
+      - key: GOOGLE_CLIENT_ID     # Gmail "Connect"
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+    disk:
+      name: copilot-data
+      mountPath: /app/copilot/engine/data
+      sizeGB: 1
