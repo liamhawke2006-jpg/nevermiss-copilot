@@ -124,6 +124,17 @@
   @keyframes shim{to{background-position:-220% 0}}
   @media(max-width:820px){.grid{grid-template-columns:repeat(2,1fr)}.row2{grid-template-columns:1fr}.heroflex{align-items:flex-start}}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.feed .item.reveal{opacity:1;transform:none}.emp .bar>div,.splitbar .seg{transition:none}}
+  /* task composer */
+  #compose{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:40;width:min(720px,92vw);
+    display:flex;gap:10px;align-items:center;background:rgba(15,23,20,.92);backdrop-filter:blur(10px);
+    border:1px solid var(--line-2,#2C3D37);border-radius:16px;padding:10px 12px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  #compose input{flex:1;background:transparent;border:0;outline:0;color:var(--ink);font:15px var(--bk-sans),sans-serif}
+  #compose input::placeholder{color:#5b6f68}
+  #compose .cap{font:700 10px var(--bk-mono),monospace;letter-spacing:.14em;color:var(--muted);padding-left:4px;white-space:nowrap}
+  #compose button{background:var(--accent);color:var(--accent-ink,#062015);border:0;border-radius:11px;
+    padding:11px 18px;font:800 14px var(--bk-sans),sans-serif;cursor:pointer;white-space:nowrap}
+  #compose button:disabled{opacity:.55;cursor:default}
+  #app{padding-bottom:96px}
 </style>
 </head>
 <body>
@@ -372,6 +383,37 @@ function render(d,meta){
   if(box&&Array.isArray(d.trend)&&d.trend.length>1)sparkline(box,d.trend,{h:130,fmt:(v)=>v+"h recovered"});
   painted=true;
 }
+
+// ---- task composer: type a task -> POST /api/assign -> refresh ----
+function mountComposer(){
+  if(!CONFIG.apiBase)return; // live only (needs a real backend)
+  const bar=$(`<div id="compose">
+    <span class="cap">ASSIGN ▸</span>
+    <input id="taskInput" type="text" autocomplete="off"
+      placeholder="Tell Copilot what to do — e.g. “Draft a follow-up email to john@acme.com and send it”" />
+    <button id="taskGo" type="button">Assign →</button>
+  </div>`);
+  document.body.appendChild(bar);
+  const input=bar.querySelector("#taskInput"), go=bar.querySelector("#taskGo");
+  async function submit(){
+    const prompt=input.value.trim(); if(!prompt)return;
+    go.disabled=true; const label=go.textContent; go.textContent="Working…";
+    try{
+      const r=await fetch(CONFIG.apiBase+"/assign",{method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({prompt,tenant:CONFIG.tenant})});
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const d=await r.json();
+      input.value="";
+      const held=Number(d.run&&d.run.held)||0;
+      toast(held?`Assigned — ${held} action${held>1?"s":""} waiting for your approval`:"Assigned — Copilot handled it","approved");
+      clearTimeout(timer); timer=setTimeout(tick,500); // pull fresh numbers + pending
+    }catch(e){ toast("Couldn't assign: "+(e.message||e),"denied"); }
+    finally{ go.disabled=false; go.textContent=label; input.focus(); }
+  }
+  go.addEventListener("click",submit);
+  input.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){e.preventDefault();submit();} });
+}
+mountComposer();
 tick();
 </script>
 <!-- NeverMiss brand kit — cinematic layer (backdrop, boot, depth-light, emblem). Same as every other dashboard. -->
