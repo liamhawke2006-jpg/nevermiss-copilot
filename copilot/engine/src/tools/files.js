@@ -26,8 +26,11 @@ export default [
     description: "Read a text file",
     run: ({ file }, ctx) => {
       const p = safe(ctx.workspace, file);
+      // A missing file is a normal result, not a task-killing error — the agent
+      // sees found:false and keeps going (e.g. drafts from the task itself).
+      if (!existsSync(p) || !statSync(p).isFile()) return { file, found: false, note: "file not found — use files.list to see what exists, or proceed without it" };
       const text = readFileSync(p, "utf8");
-      return { file, bytes: text.length, text: text.slice(0, 4000) };
+      return { file, found: true, bytes: text.length, text: text.slice(0, 4000) };
     },
   },
   {
