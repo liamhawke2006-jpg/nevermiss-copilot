@@ -34,6 +34,24 @@ function ctxFor(tenantId) {
   return cache.get(tenantId);
 }
 
+// Shape a stored step into what the live "watch it work" panel renders.
+const DOMAIN_ICON = { files: "📁", comms: "✉️", http: "🌐", shell: "⌘", browser: "🧭", desktop: "🖥️" };
+function stepView(s) {
+  const domain = String(s.tool || "").split(".")[0];
+  return {
+    seq: s.seq,
+    icon: DOMAIN_ICON[domain] || "•",
+    app: domain.toUpperCase(),
+    label: s.why || s.tool,
+    status: s.status,        // done | held | error | blocked
+    decision: s.decision,    // auto | hold | error | blocked
+    risk: s.risk,
+    detail: s.status === "error" ? ((s.result && s.result.error) || "error")
+          : s.decision === "hold" ? "held — waiting for your approval"
+          : s.status === "done" ? "done" : (s.status || ""),
+  };
+}
+
 const CT = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml", ".mp4": "video/mp4", ".ico": "image/x-icon" };
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" };
 const json = (res, code, body) => { res.writeHead(code, { "content-type": "application/json", ...CORS }); res.end(JSON.stringify(body)); };
@@ -98,7 +116,23 @@ createServer(async (req, res) => {
     if (req.method === "GET" && p === "/api/tasks") return json(res, 200, c.store.all("tasks"));
     if (req.method === "GET" && p === "/api/pending") return json(res, 200, pending(c.store));
     if (req.method === "GET" && p === "/api/registry") return json(res, 200, { capabilities: c.config.capabilities, autonomy: c.config.autonomy, tools: c.registry.list() });
-    if (req.method === "POST" && p === "/api/assign") { const t = assign(c.store, body.prompt); const r = await run(c.store, t.id, { config: c.config, registry: c.registry }); return json(res, 200, { task: t, run: r }); }
+    if (req.method === "POST" && p === "/api/assign") {
+      const t = assign(c.store, body.prompt);
+      // Run in the BACKGROUND so the client can watch steps land live via /api/task.
+      run(c.store, t.id, { config: c.config, registry: c.registry })
+        .catch((e) => { c.store.update("tasks", t.id, { status: "failed" }); c.store.event(t.id, "error", `Run failed: ${e.message}`); });
+      return json(res, 200, { task: t });
+    }
+    if (req.method === "GET" && p === "/api/task") {
+      const id = Number(url.searchParams.get("id"));
+      const t = c.store.get("tasks", id);
+      if (!t) return json(res, 404, { error: "unknown task" });
+      const steps = c.store.where("steps", (s) => s.task_id === id).map(stepView);
+      const held = c.store.where("held", (h) => h.task_id === id && h.status === "pending")
+        .map((h) => ({ heldId: h.id, tool: h.tool, risk: h.risk, preview: h.preview, why: h.why }));
+      const running = t.status === "assigned" || t.status === "running";
+      return json(res, 200, { id, status: t.status, running, prompt: t.prompt, steps, held });
+    }
     if (req.method === "POST" && p === "/api/approve") { return json(res, 200, await approve(c.store, Number(body.id), { config: c.config, registry: c.registry })); }
     if (req.method === "POST" && p === "/api/deny") { return json(res, 200, deny(c.store, Number(body.id))); }
 

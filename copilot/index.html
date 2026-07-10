@@ -135,6 +135,38 @@
     padding:11px 18px;font:800 14px var(--bk-sans),sans-serif;cursor:pointer;white-space:nowrap}
   #compose button:disabled{opacity:.55;cursor:default}
   #app{padding-bottom:96px}
+  /* live "watch it work" window */
+  .wm{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,8,6,.66);backdrop-filter:blur(5px)}
+  .wm.hidden{display:none}
+  .wm-card{width:min(560px,94vw);max-height:84vh;display:flex;flex-direction:column;background:var(--surface,#0f1714);border:1px solid var(--line-2,#2C3D37);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden}
+  .wm-head{display:flex;align-items:center;gap:11px;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .wm-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:wmpulse 1.4s infinite}
+  .wm-dot.stop{animation:none;background:var(--muted)}
+  @keyframes wmpulse{0%{box-shadow:0 0 0 0 rgba(56,211,146,.5)}70%{box-shadow:0 0 0 8px rgba(56,211,146,0)}100%{box-shadow:0 0 0 0 rgba(56,211,146,0)}}
+  .wm-title{flex:1;font:800 15px var(--bk-sans),sans-serif}
+  .wm-x{background:transparent;border:0;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px}
+  .wm-task{padding:12px 18px;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line)}
+  .wm-steps{padding:4px 18px;overflow:auto;flex:1;min-height:60px}
+  .wm-step,.wm-hrow{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+  .wm-step{opacity:0;transform:translateY(6px);animation:wmin .34s ease forwards}
+  @keyframes wmin{to{opacity:1;transform:none}}
+  .wm-ic{width:27px;height:27px;flex:none;display:grid;place-items:center;border-radius:8px;background:var(--surface-2);font-size:14px}
+  .wm-body{flex:1;min-width:0}
+  .wm-lb{display:block;font:600 14px var(--bk-sans),sans-serif;overflow-wrap:anywhere}
+  .wm-dt{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+  .wm-pill{font:700 10px var(--bk-mono),monospace;letter-spacing:.06em;padding:3px 8px;border-radius:999px;white-space:nowrap;align-self:center}
+  .wm-pill.done{color:var(--good);background:rgba(56,211,146,.14)}
+  .wm-pill.held{color:var(--warn);background:rgba(217,169,70,.16)}
+  .wm-pill.error{color:var(--bad);background:rgba(240,167,159,.16)}
+  .wm-held{padding:0 18px}
+  .wm-hh{font:700 10px var(--bk-mono),monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--warn);padding:14px 0 2px}
+  .wm-acts{display:flex;gap:8px;align-self:center}
+  .wm-acts button{border:0;border-radius:9px;padding:8px 13px;font:800 12px var(--bk-sans),sans-serif;cursor:pointer}
+  .wm-acts button:disabled{opacity:.5;cursor:default}
+  .wm-ap{background:var(--accent);color:var(--accent-ink,#062015)}
+  .wm-dn{background:var(--surface-2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
+  .wm-foot{padding:15px 18px;border-top:1px solid var(--line);font:600 13px var(--bk-sans),sans-serif;color:var(--muted)}
+  .wm-foot .ok{color:var(--good)}.wm-foot .hold{color:var(--warn)}.wm-foot .err{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -404,14 +436,81 @@ function mountComposer(){
       if(!r.ok)throw new Error("HTTP "+r.status);
       const d=await r.json();
       input.value="";
-      const held=Number(d.run&&d.run.held)||0;
-      toast(held?`Assigned — ${held} action${held>1?"s":""} waiting for your approval`:"Assigned — Copilot handled it","approved");
-      clearTimeout(timer); timer=setTimeout(tick,500); // pull fresh numbers + pending
+      watchTask(d.task.id,prompt); // open the live "watch it work" window
     }catch(e){ toast("Couldn't assign: "+(e.message||e),"denied"); }
-    finally{ go.disabled=false; go.textContent=label; input.focus(); }
+    finally{ go.disabled=false; go.textContent=label; }
   }
   go.addEventListener("click",submit);
   input.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){e.preventDefault();submit();} });
+}
+// ---- live "watch it work" window ----
+const g=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ICON={files:"📁",comms:"✉️",http:"🌐",shell:"⌘",browser:"🧭",desktop:"🖥️"};
+let watchPoll=null, heldShown=new Set();
+function ensureWatch(){
+  let m=g("watch"); if(m)return m;
+  m=$(`<div id="watch" class="wm hidden"><div class="wm-card">
+    <div class="wm-head"><span class="wm-dot" id="wmDot"></span><span class="wm-title" id="wmTitle">Copilot is working…</span><button class="wm-x" id="wmX" aria-label="Close">✕</button></div>
+    <div class="wm-task" id="wmTask"></div>
+    <div class="wm-steps" id="wmSteps"></div>
+    <div class="wm-held" id="wmHeld"></div>
+    <div class="wm-foot" id="wmFoot">Starting…</div>
+  </div></div>`);
+  document.body.appendChild(m);
+  g("wmX").addEventListener("click",closeWatch);
+  m.addEventListener("click",(e)=>{ if(e.target===m)closeWatch(); });
+  return m;
+}
+function closeWatch(){ if(watchPoll){clearTimeout(watchPoll);watchPoll=null;} const m=g("watch"); if(m)m.classList.add("hidden"); clearTimeout(timer); timer=setTimeout(tick,200); }
+function watchTask(taskId,prompt){
+  ensureWatch().classList.remove("hidden");
+  g("wmTitle").textContent="Copilot is working…"; g("wmDot").classList.remove("stop");
+  g("wmTask").textContent="“"+prompt+"”"; g("wmSteps").innerHTML=""; g("wmHeld").innerHTML=""; g("wmFoot").textContent="Starting…";
+  const shown=new Set(); heldShown=new Set();
+  async function poll(){
+    let d; try{ const u=new URL(CONFIG.apiBase+"/task",location.href); u.searchParams.set("id",taskId); if(CONFIG.tenant)u.searchParams.set("tenant",CONFIG.tenant);
+      const r=await fetch(u,{cache:"no-store"}); if(!r.ok)throw 0; d=await r.json(); }
+    catch(e){ watchPoll=setTimeout(poll,900); return; }
+    (d.steps||[]).forEach((s,i)=>{ if(shown.has(s.seq))return; shown.add(s.seq);
+      const cls=s.status==="done"?"done":s.decision==="hold"?"held":s.status==="error"?"error":"";
+      const txt=s.status==="done"?"DONE":s.decision==="hold"?"HELD":s.status==="error"?"ERROR":(s.status||"").toUpperCase();
+      const row=$(`<div class="wm-step"><span class="wm-ic">${s.icon||"•"}</span><span class="wm-body"><span class="wm-lb">${esc(s.label)}</span><span class="wm-dt">${esc(s.app)} · ${esc(s.detail)}</span></span><span class="wm-pill ${cls}">${txt}</span></div>`);
+      row.style.animationDelay=(Math.min(i,6)*55)+"ms"; g("wmSteps").appendChild(row); g("wmSteps").scrollTop=g("wmSteps").scrollHeight;
+    });
+    renderHeld(d.held||[]);
+    if(d.running){ g("wmFoot").textContent="Working… "+shown.size+" step"+(shown.size===1?"":"s")+" so far"; watchPoll=setTimeout(poll,700); }
+    else finishWatch(d,shown.size);
+  }
+  poll();
+}
+function renderHeld(held){
+  const box=g("wmHeld"); const fresh=held.filter(h=>!heldShown.has(h.heldId));
+  if(fresh.length && !box.querySelector(".wm-hh")) box.insertAdjacentHTML("afterbegin",`<div class="wm-hh">Needs your approval</div>`);
+  fresh.forEach(h=>{ heldShown.add(h.heldId);
+    const row=$(`<div class="wm-hrow"><span class="wm-ic">${ICON[String(h.tool).split(".")[0]]||"✉️"}</span><span class="wm-body"><span class="wm-lb">${esc(h.preview||h.why||h.tool)}</span><span class="wm-dt">${esc(h.risk)} · won’t run until you approve</span></span><span class="wm-acts"><button class="wm-ap">Approve</button><button class="wm-dn">Deny</button></span></div>`);
+    row.querySelector(".wm-ap").addEventListener("click",()=>resolveHeld(h.heldId,true,row));
+    row.querySelector(".wm-dn").addEventListener("click",()=>resolveHeld(h.heldId,false,row));
+    box.appendChild(row);
+  });
+}
+async function resolveHeld(heldId,ok,row){
+  row.querySelectorAll("button").forEach(b=>b.disabled=true);
+  try{ const r=await fetch(CONFIG.apiBase+"/"+(ok?"approve":"deny"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:heldId,tenant:CONFIG.tenant})});
+    if(!r.ok)throw 0;
+    const a=row.querySelector(".wm-acts"); if(a)a.outerHTML=`<span class="wm-pill ${ok?"done":"error"}">${ok?"✓ Approved — ran":"✕ Denied"}</span>`;
+    clearTimeout(timer); timer=setTimeout(tick,300);
+  }catch(e){ row.querySelectorAll("button").forEach(b=>b.disabled=false); }
+}
+function finishWatch(d,n){
+  if(watchPoll){clearTimeout(watchPoll);watchPoll=null;} g("wmDot").classList.add("stop");
+  const done=(d.steps||[]).filter(s=>s.status==="done").length;
+  const held=(d.held||[]).length, err=(d.steps||[]).filter(s=>s.status==="error").length;
+  if(d.status==="awaiting_approval"||held>0){ g("wmTitle").textContent="Waiting for your approval";
+    g("wmFoot").innerHTML=`<span class="hold">${held} action${held===1?"":"s"} held</span> · ${done} ran automatically. Nothing sends until you approve.`; }
+  else if(d.status==="failed"||err>0){ g("wmTitle").textContent="Hit a snag";
+    g("wmFoot").innerHTML=`<span class="err">${err} error${err===1?"":"s"}</span> · ${done} step${done===1?"":"s"} completed.`; }
+  else { g("wmTitle").textContent="Done"; g("wmFoot").innerHTML=`<span class="ok">✓ Completed</span> · ${done} step${done===1?"":"s"} — nothing needed approval.`; }
 }
 mountComposer();
 tick();
