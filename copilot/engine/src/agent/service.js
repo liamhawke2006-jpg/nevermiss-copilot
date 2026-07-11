@@ -9,6 +9,7 @@ import { prune } from "./audit.js";
 import { makePlanner } from "./planner.js";
 import * as realBrowser from "./browser.js";
 import { makeOpenPage, closeClient, closeAll } from "./pagepool.js";
+import { raiseAlerts } from "./alerts.js";
 
 // createAgentService deps:
 //   store    — JSON store (store.js); uses `agentClients` + `agentSessions` collections.
@@ -17,9 +18,10 @@ import { makeOpenPage, closeClient, closeAll } from "./pagepool.js";
 //              module (LIVE-gated). Tests inject a fake.
 //   planner  — planner(ctx)->action. Default: makePlanner(config).
 //   openPage — (state)->page. Default: launch the client's isolated Playwright profile.
-export function createAgentService({ store, config = {}, browser = realBrowser, planner, openPage, caps = DEFAULT_CAPS }) {
+export function createAgentService({ store, config = {}, browser = realBrowser, planner, openPage, caps = DEFAULT_CAPS, alertNotify }) {
   const plan = planner || makePlanner(config);
   const open = openPage || makeOpenPage(config); // production: pooled per-client browser
+  const inflight = new Set(); // per-client single-flight: one task at a time per client
 
   function stateFor(clientId) {
     let row = store.where("agentClients", (c) => c.clientId === String(clientId))[0];
@@ -32,16 +34,22 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
 
   // Assign a plain-English task. Runs the gated loop; persists the recorded session.
   async function assign(clientId, prompt, { now = () => Date.now() } = {}) {
-    const state = stateFor(clientId);
+    const cid = String(clientId);
+    const state = stateFor(cid);
     if (isHalted(state)) return { status: "halted", reason: "kill switch engaged for this client" };
-    let page;
-    try { page = await launch(state); }
-    catch (e) { return { status: "browser_unavailable", reason: e.message }; } // LIVE-gated until Playwright is wired
-    const row = store.insert("agentSessions", { clientId: String(clientId), assignment: prompt, status: "running", startedAt: iso(now()) });
-    const res = await runTask({ state, assignment: prompt, planner: plan, browser, page, caps, taskId: row.id, startMs: now(), now });
-    store.update("agentSessions", row.id, { ...res.session, status: res.status, held: res.held || null, blocked: res.blocked || null, injection: res.injection || null });
-    persist(state);
-    return { taskId: row.id, ...res };
+    if (inflight.has(cid)) return { status: "busy", reason: "a task is already running for this client — one at a time" };
+    inflight.add(cid);
+    try {
+      let page;
+      try { page = await launch(state); }
+      catch (e) { return { status: "browser_unavailable", reason: e.message }; } // LIVE-gated until Playwright is wired
+      const row = store.insert("agentSessions", { clientId: cid, assignment: prompt, status: "running", startedAt: iso(now()) });
+      const res = await runTask({ state, assignment: prompt, planner: plan, browser, page, caps, taskId: row.id, startMs: now(), now });
+      store.update("agentSessions", row.id, { ...res.session, status: res.status, held: res.held || null, blocked: res.blocked || null, injection: res.injection || null });
+      persist(state);
+      const alerts = await raiseAlerts({ ...res.session, taskId: row.id }, { config, store, notify: alertNotify }); // operator alerts
+      return { taskId: row.id, ...res, alerts };
+    } finally { inflight.delete(cid); }
   }
 
   // Approve the parked Tier-2 action of a session — fires it ONCE (idempotent).

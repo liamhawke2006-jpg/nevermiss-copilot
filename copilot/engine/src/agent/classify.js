@@ -34,8 +34,11 @@ const AUTO_TYPES = new Set([
 const CARD_RE = /\b(?:\d[ -]?){13,19}\b/;                 // 13–19 digit PAN
 const SSN_RE = /\b\d{3}-\d{2}-\d{4}\b/;                    // US SSN
 const EIN_RE = /\b\d{2}-\d{7}\b/;                          // US EIN
+const IBAN_RE = /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/;        // international bank account
+const BTC_RE = /\b(bc1[a-z0-9]{20,}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/; // BTC wallet
+const ETH_RE = /\b0x[a-fA-F0-9]{40}\b/;                   // ETH wallet
 const CVV_RE = /\bcvv\b|\bcvc\b|security\s*code/i;
-const SECRET_FIELD_RE = /pass(word|wd)?|passphrase|otp|2fa|mfa|ssn|social.?security|ein|routing|account.?number|card.?number|cardnum|cvv|cvc|pin\b/i;
+const SECRET_FIELD_RE = /pass(word|wd)?|passphrase|secret|private.?key|seed.?phrase|mnemonic|otp|2fa|mfa|ssn|social.?security|ein|routing|iban|swift|sort.?code|account.?number|card.?number|cardnum|cvv|cvc|\bpin\b|api.?key|token/i;
 const luhn = (s) => {
   const d = String(s).replace(/[^\d]/g, "");
   if (d.length < 13 || d.length > 19) return false;
@@ -51,7 +54,7 @@ const CLICK_HOLD_RE = /\b(send|submit|pay|buy|purchase|place\s+order|checkout|pu
 function looksSensitive(value = "", field = "") {
   if (SECRET_FIELD_RE.test(field)) return true;
   const v = String(value);
-  if (SSN_RE.test(v) || EIN_RE.test(v) || CVV_RE.test(field)) return true;
+  if (SSN_RE.test(v) || EIN_RE.test(v) || IBAN_RE.test(v) || BTC_RE.test(v) || ETH_RE.test(v) || CVV_RE.test(field)) return true;
   if (CARD_RE.test(v) && luhn(v)) return true;
   return false;
 }

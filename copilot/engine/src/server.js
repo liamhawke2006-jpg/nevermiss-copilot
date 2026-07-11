@@ -167,6 +167,7 @@ createServer(async (req, res) => {
       if (req.method === "POST" && p === "/api/agent/kill") return json(res, 200, body.global ? svc.killGlobal() : svc.kill(client));
       if (req.method === "POST" && p === "/api/agent/unkill") return json(res, 200, svc.unkill(client));
       if (req.method === "POST" && p === "/api/agent/domain") return json(res, 200, svc.allowDomain(client, body.domain));
+      if (req.method === "GET" && p === "/api/agent/alerts") return json(res, 200, { alerts: c.store.where("events", (e) => e.type === "agent_alert").slice(-50).reverse() });
       if (req.method === "GET" && p === "/api/agent/sessions") return json(res, 200, { sessions: svc.sessions(client) });
       if (req.method === "GET" && p === "/api/agent/session") return json(res, 200, svc.session(url.searchParams.get("id")) || { error: "not found" });
       if (req.method === "GET" && p === "/api/agent/client") return json(res, 200, svc.clientView(client));

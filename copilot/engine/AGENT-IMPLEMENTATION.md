@@ -56,9 +56,22 @@ must never receive, type, or store credentials — `classify.js` already Tier-3-
 any credential entry even if a plan proposes it.
 
 ## Anomaly alerts (wire to Liam)
-Tap the audit `event` stream per session and alert on:
-`injection_freeze` · `blocked` (tier 3) · `domain_not_allowed` (esp. banking/legal
-categories) · repeated Tier-3 attempts in one task. Send to Liam (email/Slack).
+`alerts.js` already computes them from each recorded session: `repeated_tier3`,
+`prompt_injection`, `new_sensitive_domain` (banking/legal/health, via `domains.js`,
+categorized from the hostname so page content can't spoof it). They're emitted as
+`agent_alert` events and returned on the `assign` response; `GET /api/agent/alerts`
+lists them. **Wire `alertNotify`** (a `createAgentService` option) to email/Slack Liam
+in production.
+
+## Hardening already in place (v2)
+- **Injection defense**: normalizes content first (NFKC + strips zero-width/unicode-
+  tag chars), then catches imperative payloads, embedded tool-call syntax, hidden
+  CSS/DOM, suspicious attributes, lookalike approval dialogs, and **base64-encoded**
+  instructions. Gauntlet = the original 20 poisoned pages **plus** obfuscated attacks
+  (zero-width, homoglyph, base64, tool-syntax, hidden, roleplay).
+- **Tier-3 gates**: passwords, cards (Luhn), SSN/EIN, **IBAN, BTC/ETH wallets, seed
+  phrases, API keys/private keys** — all refused in code.
+- **Task locking**: one task per client at a time (no interleaved browser sessions).
 
 ## Acceptance criteria — these MUST stay green
 `node test/all.js` → the `agent-mode` suite. If any of these fail, do not ship:
