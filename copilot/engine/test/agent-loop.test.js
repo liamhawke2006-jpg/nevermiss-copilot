@@ -55,7 +55,7 @@ import { openMemory } from "../src/store.js";
   const browser = { observe: async () => ({ url: "https://ok.test", text: "Buyer SSN 111-22-3333 wants a recap", html: "<p>ok</p>" }), act: async () => {} };
   const svc = createAgentService({ store, config: { offline: true }, browser, planner: async () => ({ type: "send_email", to: "c@x.com", subject: "Recap", body: "hi" }), openPage: async () => ({}) });
   svc.allowDomain("acme", "ok.test");
-  const res = await svc.assign("acme", "email a recap");
+  const res = await svc.assign("acme", "email a recap to my client");
   assert.equal(res.status, "parked_approval");
   assert.match(res.held.explain, /Ready to send an email/i, "held payload carries the explanation");
 

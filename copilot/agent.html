@@ -87,6 +87,15 @@ h3.sec{font-size:13px;letter-spacing:.04em;color:var(--ink2);margin:2px 0 0}
       <div class="chips" style="margin-top:6px"><span class="muted small">Approved domains:</span><span class="chip">nabis.pro</span><span class="chip">gmail.com</span><span class="chip">quickbooks.intuit.com</span><span class="chip muted">+ approve a new one once</span></div>
     </div>
 
+    <!-- Ask-First clarification (shown when a task is ambiguous) -->
+    <div class="card" id="clarifyCard" style="display:none;border:1px solid rgba(51,183,204,.45)">
+      <div class="task-h"><div><div class="k" style="color:var(--aqua)">One quick question before I start</div>
+        <h3 class="sec" id="clarifyQ"></h3></div><span class="status" style="color:var(--aqua);background:rgba(51,183,204,.14)">Ask-First</span></div>
+      <div class="small muted" style="margin-top:6px">I'd rather ask than guess — this keeps me from doing the wrong thing confidently.</div>
+      <div class="row" style="margin-top:8px"><input id="clarifyAns" placeholder="Your answer…" style="flex:1"/><button class="ap" style="border:0;border-radius:10px;padding:0 16px;font-weight:800;cursor:pointer" onclick="answerClarify()">Continue →</button></div>
+      <input type="hidden" id="clarifyPrompt"/>
+    </div>
+
     <!-- Plan Preview & Trust Map (shown BEFORE a task runs) -->
     <div class="card" id="planCard" style="display:none;border:1px solid rgba(51,183,204,.4)">
       <div class="task-h"><div><div class="k" style="color:var(--aqua)">Plan preview · here's exactly what I'll do</div>
@@ -197,8 +206,17 @@ function matchPlan(a){a=(a||"").toLowerCase();
   if(/menu|listing|copy|publish/.test(a))return"update_listing";
   return"general";}
 const GATE=[,"auto","pause for your approval","refuse — you do it"];
+// Ask-First — mirror of src/agent/ambiguity.js: pause to ask, don't guess.
+function ambiguityQ(a){a=(a||"").toLowerCase();
+  if(/(email|send|message|remind|recap|reply|notify)/.test(a) && !/@|\b(the|my|our)\s+(client|customer|manager|team|owner|boss)\b|\bto\s+\w/.test(a)) return "Who should I send this to?";
+  if(/(book|schedule|appointment|meeting)/.test(a) && !/(mon|tue|wed|thu|fri|sat|sun|today|tomorrow|next week|\d\s?(am|pm)|\d:\d)/.test(a)) return "What day and time should I book?";
+  if(/(buy|purchase|order|pay)/.test(a) && !/\$|\d/.test(a)) return "What exactly should I buy, and any budget limit?";
+  return null;}
+function answerClarify(){const ans=$("#clarifyAns").value.trim();if(!ans)return;$("#prompt").value=$("#clarifyPrompt").value+" to "+ans;$("#clarifyCard").style.display="none";$("#clarifyAns").value="";demoAssign();}
 function demoAssign(){
   const prompt=$("#prompt").value||"Chase my overdue invoices";
+  const q=ambiguityQ(prompt);
+  if(q){$("#clarifyQ").textContent=q;$("#clarifyPrompt").value=prompt;$("#clarifyCard").style.display="block";$("#planCard").style.display="none";$("#clarifyCard").scrollIntoView({behavior:"smooth",block:"center"});return;}
   const plan=PLANS[matchPlan(prompt)];
   $("#taskName").textContent=prompt;
   $("#planSummary").textContent=plan.sum;

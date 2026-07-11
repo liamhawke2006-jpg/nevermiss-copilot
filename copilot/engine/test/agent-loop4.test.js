@@ -55,7 +55,7 @@ const fakeBrowser = () => ({ observe: async () => ({ url: "https://ok.test", tex
   const svc = createAgentService({ store, config: { offline: true }, browser: fakeBrowser(), planner: async () => ({ type: "send_email", to: "c@acme.com", subject: "R", body: "b" }), openPage: async () => ({}) });
   svc.allowDomain("acme", "ok.test");
   svc.addNote("acme", "keep replies short");
-  await svc.assign("acme", "email a recap");
+  await svc.assign("acme", "email a recap to my client");
 
   const d = svc.dashboard("acme");
   assert.ok(d.trust && d.trust.grade, "trust score + grade");

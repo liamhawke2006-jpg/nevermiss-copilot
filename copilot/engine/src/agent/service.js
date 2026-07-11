@@ -51,10 +51,10 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
       try { page = await launch(state); }
       catch (e) { return { status: "browser_unavailable", reason: e.message }; } // LIVE-gated until Playwright is wired
       const row = store.insert("agentSessions", { clientId: cid, assignment: prompt, status: "running", startedAt: iso(now()) });
-      const res = await runTask({ state, assignment: prompt, planner: plan, browser, page, caps, taskId: row.id, startMs: now(), now, verifier: verify, memory: state.notes || [] });
+      const res = await runTask({ state, assignment: prompt, planner: plan, browser, page, caps, taskId: row.id, startMs: now(), now, verifier: verify, memory: state.notes || [], askFirst: true });
       // c21 — a task that wanted a new domain surfaces it for one-click approval.
       if (res.status === "parked_domain" && res.domain && !(state.pendingDomains || []).includes(res.domain)) (state.pendingDomains = state.pendingDomains || []).push(res.domain);
-      store.update("agentSessions", row.id, { ...res.session, status: res.status, held: res.held || null, blocked: res.blocked || null, injection: res.injection || null });
+      store.update("agentSessions", row.id, { ...res.session, status: res.status, held: res.held || null, blocked: res.blocked || null, injection: res.injection || null, question: res.question || null });
       persist(state);
       const alerts = await raiseAlerts({ ...res.session, taskId: row.id }, { config, store, notify: alertNotify }); // operator alerts
       return { taskId: row.id, ...res, alerts };

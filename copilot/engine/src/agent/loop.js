@@ -6,6 +6,7 @@ import { classify, TIER } from "./classify.js";
 import { scanInjection, destinationFromContent } from "./injection.js";
 import { shieldPII } from "./pii.js";
 import { explainAction } from "./explain.js";
+import { clarify } from "./clarify.js";
 import { isDomainAllowed, hostOf, isHalted, canRequestApproval, canSendEmail, recordApproval, recordEmail, idemKey, alreadyFired, markFired, runtimeExceeded, DEFAULT_CAPS } from "./guards.js";
 import { newSession, record } from "./audit.js";
 
@@ -50,7 +51,7 @@ export async function performApproved(state, page, browser, action, caps = DEFAU
 
 // The full loop. Returns the session (audit) + a terminal status:
 //   done | frozen (injection) | parked_approval | parked_domain | parked_timeout | halted | blocked_handoff
-export async function runTask({ state, assignment, planner, browser, page, caps = DEFAULT_CAPS, taskId = 0, startMs = 0, now = () => Date.now(), maxSteps = 24, verifier = null, memory = [] }) {
+export async function runTask({ state, assignment, planner, browser, page, caps = DEFAULT_CAPS, taskId = 0, startMs = 0, now = () => Date.now(), maxSteps = 24, verifier = null, memory = [], askFirst = false }) {
   const t0 = startMs || now();
   const session = newSession(state.clientId, taskId, assignment);
   const finish = (status, extra = {}) => { session.status = status; session.endedAt = new Date(now()).toISOString().slice(0, 19).replace("T", " "); return { ...extra, session, status }; };
@@ -74,6 +75,13 @@ export async function runTask({ state, assignment, planner, browser, page, caps 
     if (shield.redactions) record(session, { event: "pii_redacted", note: `${shield.redactions} PII value(s) hidden from the model`, kinds: shield.kinds });
     const action = await planner({ assignment, memory, observation: { url: obs.url, text: shield.text, axtree: obs.axtree }, history: session.steps });
     if (!action || action.type === "done") { record(session, { event: "done" }); return finish("done"); }
+
+    // ASK-FIRST — if the task is ambiguous or this step is low-confidence, pause and
+    // ask the client a question instead of guessing.
+    if (askFirst) {
+      const q = clarify({ assignment, action, observation: { url: obs.url, text: shield.text } });
+      if (q) { record(session, { action, event: "needs_clarification", note: q }); return finish("needs_clarification", { question: q }); }
+    }
 
     // Domain allowlist + content-sourced destination (goals come only from the assignment).
     if ((action.type === "navigate" || action.type === "goto") && action.url) {
