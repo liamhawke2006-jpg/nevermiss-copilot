@@ -1,0 +1,22 @@
+# Agent Mode image — the base engine PLUS Chromium. Building/running this image IS
+# the go-live step that the AGENT_BROWSER_LIVE review gate guards. Only build it
+# after reviewing src/agent/browser.js. Build from the repo root:
+#   docker build -f deploy/agent/Dockerfile.agent -t nevermiss-copilot-agent .
+FROM node:20-slim
+WORKDIR /app
+
+COPY copilot/engine/package.json ./copilot/engine/
+# Install deps INCLUDING the Chromium binary (with OS libs). This is the heavy,
+# deliberate step — it's why it lives in a separate, reviewed image.
+RUN cd copilot/engine && npm install --no-audit --no-fund \
+    && npx playwright install --with-deps chromium
+
+COPY copilot/engine ./copilot/engine
+COPY copilot/index.html copilot/onboarding.html copilot/agent.html ./copilot/
+COPY brand ./brand
+
+WORKDIR /app/copilot/engine
+# AGENT_BROWSER_LIVE is enabled ONLY in this reviewed image.
+ENV NODE_ENV=production COPILOT_OFFLINE=0 AGENT_BROWSER_LIVE=1
+EXPOSE 3300
+CMD ["node", "src/server.js"]

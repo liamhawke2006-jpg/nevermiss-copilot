@@ -8,6 +8,7 @@ import { engageKill, releaseKill, engageGlobalKill, approveDomain, isHalted, DEF
 import { prune } from "./audit.js";
 import { makePlanner } from "./planner.js";
 import * as realBrowser from "./browser.js";
+import { makeOpenPage, closeClient, closeAll } from "./pagepool.js";
 
 // createAgentService deps:
 //   store    — JSON store (store.js); uses `agentClients` + `agentSessions` collections.
@@ -18,6 +19,7 @@ import * as realBrowser from "./browser.js";
 //   openPage — (state)->page. Default: launch the client's isolated Playwright profile.
 export function createAgentService({ store, config = {}, browser = realBrowser, planner, openPage, caps = DEFAULT_CAPS }) {
   const plan = planner || makePlanner(config);
+  const open = openPage || makeOpenPage(config); // production: pooled per-client browser
 
   function stateFor(clientId) {
     let row = store.where("agentClients", (c) => c.clientId === String(clientId))[0];
@@ -26,11 +28,7 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
   }
   const persist = (state) => store.update("agentClients", state.id, state);
 
-  async function launch(state) {
-    if (openPage) return openPage(state);
-    const { page } = await realBrowser.launchProfile(state.profileDir, { headless: config.browserHeadless !== false });
-    return page;
-  }
+  const launch = (state) => open(state);
 
   // Assign a plain-English task. Runs the gated loop; persists the recorded session.
   async function assign(clientId, prompt, { now = () => Date.now() } = {}) {
@@ -63,9 +61,9 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
     return { status: "denied" };
   }
 
-  function kill(clientId) { const st = stateFor(clientId); engageKill(st); persist(st); return { killed: true }; }
+  function kill(clientId) { const st = stateFor(clientId); engageKill(st); persist(st); closeClient(clientId).catch(() => {}); return { killed: true }; }
   function unkill(clientId) { const st = stateFor(clientId); releaseKill(st); persist(st); return { killed: false }; }
-  function killGlobal() { engageGlobalKill(); return { globalKill: true }; }
+  function killGlobal() { engageGlobalKill(); closeAll().catch(() => {}); return { globalKill: true }; }
   function allowDomain(clientId, domain) { const st = stateFor(clientId); approveDomain(st, domain); persist(st); return { allowlist: st.allowlist }; }
 
   function sessions(clientId) { return prune(store.where("agentSessions", (s) => s.clientId === String(clientId))); }

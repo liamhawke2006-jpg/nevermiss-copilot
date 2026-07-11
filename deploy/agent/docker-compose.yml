@@ -1,0 +1,54 @@
+# Agent Mode — container-per-client topology. Each client gets its OWN browser
+# worker with its OWN profile volume: no shared cookies, no shared egress, no
+# cross-client bleed. That physical isolation is the product's safety floor.
+#
+# Scale by adding one `client-<id>` service per client (or template this in your
+# orchestrator / spawn workers dynamically). The `engine` service is the API +
+# console; it routes ?tenant=<clientId> to that client's worker.
+#
+#   docker compose -f deploy/agent/docker-compose.yml up --build
+version: "3.9"
+
+x-agent: &agent
+  build:
+    context: ../..
+    dockerfile: deploy/agent/Dockerfile.agent
+  restart: unless-stopped
+  environment:
+    COPILOT_OFFLINE: "0"
+    AGENT_BROWSER_LIVE: "1"
+    AGENT_MAX_APPROVALS_PER_DAY: "25"
+    AGENT_MAX_EMAILS_PER_DAY: "20"
+    AGENT_MAX_TASK_MIN: "15"
+    # ANTHROPIC_API_KEY, COPILOT_SECRET_KEY, etc. come from your secret store.
+
+services:
+  engine:
+    <<: *agent
+    ports: ["3300:3300"]
+    volumes:
+      - engine-data:/app/copilot/engine/data
+
+  # ── one worker per client — isolated profile volume, isolated cookies ──
+  client-acme:
+    <<: *agent
+    environment:
+      COPILOT_OFFLINE: "0"
+      AGENT_BROWSER_LIVE: "1"
+      CLIENT_ID: "acme"
+    volumes:
+      - acme-profile:/app/copilot/engine/agent-profiles/acme
+
+  client-beeco:
+    <<: *agent
+    environment:
+      COPILOT_OFFLINE: "0"
+      AGENT_BROWSER_LIVE: "1"
+      CLIENT_ID: "beeco"
+    volumes:
+      - beeco-profile:/app/copilot/engine/agent-profiles/beeco
+
+volumes:
+  engine-data: {}
+  acme-profile: {}   # never shared — one volume per client
+  beeco-profile: {}

@@ -16,6 +16,7 @@ const suites = [
   ["oauth      (Gmail connect flow + Gmail send doer)",    "test/oauth.test.js"],
   ["upgrades   (audit/TTL/cap/redact/idempotent/health)",  "test/upgrades.test.js"],
   ["agent-mode (gates/injection/isolation/killswitch)",    "test/agent-mode.test.js"],
+  ["agent-live (real Chromium — skips until go-live flip)","test/agent-live.test.js"],
 ];
 let failed = 0;
 const t0 = Date.now();
