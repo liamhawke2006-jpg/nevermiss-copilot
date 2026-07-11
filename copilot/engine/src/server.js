@@ -29,6 +29,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const CONSOLE = join(here, "..", "..", "index.html");
 const ONBOARD = join(here, "..", "..", "onboarding.html");
 const AGENT = join(here, "..", "..", "agent.html");
+const AGENT_DASH = join(here, "..", "..", "agent-dashboard.html");
 const REPO = resolve(join(here, "..", "..", ".."));
 
 const tenants = openTenants();
@@ -164,6 +165,9 @@ createServer(async (req, res) => {
       const client = tid || "_legacy";
       if (req.method === "POST" && p === "/api/agent/preview") return json(res, 200, svc.preview(body.prompt)); // Plan Preview — no execution
       if (req.method === "GET" && p === "/api/agent/stats") return json(res, 200, svc.stats(client));
+      if (req.method === "GET" && p === "/api/agent/dashboard") return json(res, 200, svc.dashboard(client));
+      if (req.method === "GET" && p === "/api/agent/pending-domains") return json(res, 200, { pendingDomains: svc.pendingDomains(client) });
+      if (req.method === "POST" && p === "/api/agent/note") return json(res, 200, svc.addNote(client, body.note));
       if (req.method === "GET" && p === "/api/agent/reportcard") return json(res, 200, svc.reportCard(client));
       if (req.method === "GET" && p === "/api/agent/digest") return json(res, 200, svc.digest(client));
       if (req.method === "GET" && p === "/api/agent/redteam") return json(res, 200, redTeamReport());
@@ -184,6 +188,7 @@ createServer(async (req, res) => {
 
     // ---- static ----
     if (req.method === "GET" && (p === "/onboarding.html" || p === "/onboard" || p === "/connect")) return serveFile(res, ONBOARD);
+    if (req.method === "GET" && (p === "/agent-dashboard" || p === "/agent-dashboard.html")) return serveFile(res, AGENT_DASH);
     if (req.method === "GET" && (p === "/agent" || p === "/agent.html")) return serveFile(res, AGENT);
     if (req.method === "GET" && (p === "/" || p === "/index.html")) return serveFile(res, CONSOLE);
     if (req.method === "GET" && p.startsWith("/brand/") && !p.includes("..")) return serveFile(res, join(REPO, p));

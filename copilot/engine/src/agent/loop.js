@@ -50,7 +50,7 @@ export async function performApproved(state, page, browser, action, caps = DEFAU
 
 // The full loop. Returns the session (audit) + a terminal status:
 //   done | frozen (injection) | parked_approval | parked_domain | parked_timeout | halted | blocked_handoff
-export async function runTask({ state, assignment, planner, browser, page, caps = DEFAULT_CAPS, taskId = 0, startMs = 0, now = () => Date.now(), maxSteps = 24, verifier = null }) {
+export async function runTask({ state, assignment, planner, browser, page, caps = DEFAULT_CAPS, taskId = 0, startMs = 0, now = () => Date.now(), maxSteps = 24, verifier = null, memory = [] }) {
   const t0 = startMs || now();
   const session = newSession(state.clientId, taskId, assignment);
   const finish = (status, extra = {}) => { session.status = status; session.endedAt = new Date(now()).toISOString().slice(0, 19).replace("T", " "); return { ...extra, session, status }; };
@@ -72,7 +72,7 @@ export async function runTask({ state, assignment, planner, browser, page, caps 
     // redacted before the model ever sees it.
     const shield = shieldPII(obs.text);
     if (shield.redactions) record(session, { event: "pii_redacted", note: `${shield.redactions} PII value(s) hidden from the model`, kinds: shield.kinds });
-    const action = await planner({ assignment, observation: { url: obs.url, text: shield.text, axtree: obs.axtree }, history: session.steps });
+    const action = await planner({ assignment, memory, observation: { url: obs.url, text: shield.text, axtree: obs.axtree }, history: session.steps });
     if (!action || action.type === "done") { record(session, { event: "done" }); return finish("done"); }
 
     // Domain allowlist + content-sourced destination (goals come only from the assignment).

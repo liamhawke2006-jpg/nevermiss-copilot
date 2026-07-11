@@ -27,6 +27,17 @@ const IMPERATIVE = [
   /\bapprove\b.*\b(automatically|without asking|on your own|this for me|silently)\b/i,
   /\b(act|pretend|roleplay) as\b.*\b(admin|system|developer|owner|different)\b/i,
 ];
+// Injection payloads in other languages — attacks aren't only in English.
+const MULTILANG = [
+  /ignor[ae] (las |les )?(instrucciones|instructions) (anteriores|précédentes|previas)/i, // es/fr
+  /olvida (tus|las) instrucciones|oublie(z)? (tes|les|vos) instructions/i,               // es/fr
+  /ignoriere (die |alle )?(vorherigen |vorigen )?anweisungen|vergiss (deine|die) anweisungen/i, // de
+  /ignora (le |tutte le )?istruzioni precedenti|dimentica le tue istruzioni/i,           // it
+  /忽略(以上|之前|前面)的(指令|指示|命令)/,                                              // zh
+  /前の指示を無視/,                                                                     // ja
+  /(envía|enviar|transfiere|transférer|überweise|invia).{0,20}(a|à|an|zu)\s/i,           // "send/transfer to" es/fr/de/it
+];
+
 // Tool-call / function-call-looking syntax embedded in content (agents get fooled).
 const TOOL_SYNTAX = [
   /```[\s\S]*?"(tool|action|function|command)"\s*:/i,
@@ -70,6 +81,8 @@ export function scanInjection(text = "", html = "") {
   if (n.hadInvisible || nHtml.hadInvisible) push("invisible-characters", "zero-width / unicode-tag characters found in content");
   runGroup(IMPERATIVE, "imperative-aimed-at-agent", n.text);
   runGroup(IMPERATIVE, "imperative-aimed-at-agent", nHtml.text);
+  runGroup(MULTILANG, "imperative-non-english", n.text);
+  runGroup(MULTILANG, "imperative-non-english", nHtml.text);
   runGroup(TOOL_SYNTAX, "embedded-tool-call", n.text);
   runGroup(TOOL_SYNTAX, "embedded-tool-call", rawHtml);
   runGroup(HIDDEN_SIGNALS, "hidden-content", rawHtml);

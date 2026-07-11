@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Trust Dashboard · Agent Mode — NeverMiss</title>
+<style>
+:root{--bg:#0A0F0D;--surface:#0F1614;--surface-2:#141E1A;--line:#213029;--ink:#E9F1EE;--ink2:#AEC0B8;--muted:#7C918A;
+--accent:#37D392;--accent-ink:#052014;--warn:#E5B457;--danger:#F0685E;--aqua:#33B7CC;
+--mono:ui-monospace,"JetBrains Mono",Menlo,monospace;--sans:-apple-system,Inter,system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1100px 560px at 78% -12%,#12201b 0%,var(--bg) 55%);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:26px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.brand{display:flex;gap:12px;align-items:center}
+.logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(140deg,var(--accent),var(--aqua));color:#04120c;display:grid;place-items:center;font-weight:800}
+.brand h1{font-size:17px;margin:0}.brand .sub{font:11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+a.btn{text-decoration:none;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font-size:13px}
+.k{font:10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--aqua)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.grid2{display:grid;grid-template-columns:320px 1fr;gap:16px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.gauge{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0}
+.ring{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--accent) var(--pct),#1c2a24 0);position:relative}
+.ring::after{content:"";position:absolute;inset:12px;border-radius:50%;background:var(--surface)}
+.ring .v{position:relative;z-index:1;text-align:center}
+.ring .num{font:800 40px var(--mono);color:var(--ink)}.ring .g{font:12px var(--mono);color:var(--accent)}
+.factors{margin-top:8px;font-size:12.5px;color:var(--ink2)}.factors div{padding:3px 0}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:600px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.tile .kk{font:9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tile .vv{font:800 26px var(--mono);margin-top:4px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px;align-items:center}
+.row:first-child{border-top:0}
+.pill{font:700 9px var(--mono);letter-spacing:.06em;padding:4px 9px;border-radius:999px;text-transform:uppercase}
+.pill.done{color:var(--accent);background:rgba(55,211,146,.13)}.pill.parked{color:var(--warn);background:rgba(229,180,87,.14)}
+.pill.frozen{color:var(--danger);background:rgba(240,104,94,.14)}.pill.hand{color:var(--danger);background:rgba(240,104,94,.1)}
+.chip{font:11px var(--mono);padding:5px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink2)}
+.approve{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:12px}
+.mini{font-size:12px;color:var(--muted)}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:7px}
+.grid3{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+@media(max-width:820px){.grid3{grid-template-columns:1fr}}
+h3.sec{font-size:13px;color:var(--ink2);margin:0 0 2px}
+.green{color:var(--accent)}.amber{color:var(--warn)}.red{color:var(--danger)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><div class="logo">◎</div>
+      <div><h1>Trust Dashboard · <span id="client">Harbor Wellness Co.</span></h1>
+      <div class="sub">Agent Mode · your control room</div></div></div>
+    <a class="btn" href="agent.html">← Agent console</a>
+  </div>
+
+  <div class="grid2">
+    <!-- trust score -->
+    <div class="card">
+      <div class="k">Trust score</div>
+      <div class="gauge">
+        <div class="ring" id="ring"><div class="v"><div class="num" id="score">—</div><div class="g" id="grade"></div></div></div>
+        <div id="headline" style="font-weight:700;margin-top:6px"></div>
+      </div>
+      <div class="factors" id="factors"></div>
+    </div>
+
+    <!-- stat tiles -->
+    <div class="card">
+      <div class="k">This period</div>
+      <div class="tiles" id="tiles" style="margin-top:10px"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <div><span class="k">Red-team defense</span><div id="redteam" style="font-weight:700;margin-top:3px"></div></div>
+        <div style="text-align:right"><span class="k">Est. AI cost</span><div id="cost" style="font:700 18px var(--mono);margin-top:3px"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <!-- recent sessions (replay gallery) -->
+    <div class="card">
+      <div class="k">Recent tasks · click to replay</div>
+      <div id="recent" style="margin-top:6px"></div>
+    </div>
+    <!-- alerts + red-team + notes -->
+    <div class="card">
+      <div class="k">Anomaly alerts</div>
+      <div id="alerts" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <!-- allowlist + pending approvals -->
+    <div class="card">
+      <div class="k">Approved domains &amp; pending requests</div>
+      <div id="domains" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px"></div>
+      <div id="pending" style="margin-top:10px"></div>
+    </div>
+    <!-- client memory -->
+    <div class="card">
+      <div class="k">What Copilot remembers</div>
+      <div id="notes" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+// Demo payload (mirrors GET /api/agent/dashboard). Live: fetch that endpoint.
+const D={
+  client:"Harbor Wellness Co.",
+  trust:{score:96,grade:"A",headline:"Fully guarded",factors:["✓ 4 credential/payment attempt(s) blocked in code","✓ 7 PII value(s) shielded from the model","✓ 12 send(s) paused for your approval","−4 · 1 injection freeze this period"]},
+  stats:{tasks:14,autoActions:63,approvalsRequested:12,tier3Blocked:4,piiRedactions:7,injectionFreezes:1},
+  redteam:{ok:true,caught:10,total:10},
+  estCostUsd:0.42,
+  recent:[
+    {assignment:"Chase overdue invoices",status:"done"},
+    {assignment:"Fill vendor onboarding form",status:"parked_approval"},
+    {assignment:"Research top 3 suppliers",status:"done"},
+    {assignment:"(poisoned page)",status:"frozen"},
+    {assignment:"Email attacker@evil.com",status:"blocked_handoff"},
+  ],
+  alerts:[
+    {sev:"high",text:"Prompt injection — task frozen on a poisoned supplier page"},
+    {sev:"medium",text:"First banking domain used: chase.com"},
+    {sev:"high",text:"Second-model review refused an unrequested send"},
+  ],
+  allowlist:["nabis.pro/orders","gmail.com","quickbooks.intuit.com"],
+  pendingDomains:["squareup.com"],
+  notes:["Always CC the manager on invoice reminders","Keep replies under 4 sentences","Never touch the payroll tab"],
+};
+function render(d){
+  $("#client").textContent=d.client;
+  $("#score").textContent=d.trust.score; $("#grade").textContent="Grade "+d.trust.grade;
+  $("#headline").textContent=d.trust.headline;
+  $("#ring").style.setProperty("--pct",(d.trust.score*3.6)+"deg");
+  $("#factors").innerHTML=d.trust.factors.map(f=>`<div>${esc(f)}</div>`).join("");
+  const s=d.stats;
+  const tiles=[["Tasks",s.tasks],["Auto steps",s.autoActions],["Paused for you",s.approvalsRequested],["Tier-3 blocked",s.tier3Blocked],["PII shielded",s.piiRedactions],["Injection freezes",s.injectionFreezes]];
+  $("#tiles").innerHTML=tiles.map(t=>`<div class="tile"><div class="kk">${t[0]}</div><div class="vv">${t[1]}</div></div>`).join("");
+  $("#redteam").innerHTML=d.redteam.ok?`<span class="green">✓ ${d.redteam.caught}/${d.redteam.total} attacks caught</span>`:`<span class="red">⚠ ${d.redteam.caught}/${d.redteam.total}</span>`;
+  $("#cost").textContent="$"+d.estCostUsd.toFixed(2);
+  const P={done:["done","done"],parked_approval:["parked","parked"],frozen:["frozen","frozen"],blocked_handoff:["hand","handed back"]};
+  $("#recent").innerHTML=d.recent.map(r=>{const p=P[r.status]||["done",r.status];return `<div class="row" style="cursor:pointer" onclick="alert('Opens the security-camera replay for: ${esc(r.assignment).replace(/'/g,'')}')"><span>${esc(r.assignment)}</span><span class="pill ${p[0]}">${p[1]}</span></div>`;}).join("");
+  const sevc={high:"var(--danger)",medium:"var(--warn)",low:"var(--muted)"};
+  $("#alerts").innerHTML=d.alerts.length?d.alerts.map(a=>`<div class="row"><span><span class="dot" style="background:${sevc[a.sev]}"></span>${esc(a.text)}</span><span class="mini">${a.sev}</span></div>`).join(""):'<div class="mini" style="margin-top:8px">No anomalies — all clear.</div>';
+  $("#domains").innerHTML=d.allowlist.map(x=>`<span class="chip">${esc(x)}</span>`).join("");
+  $("#pending").innerHTML=d.pendingDomains.length?d.pendingDomains.map(x=>`<div class="row"><span><span class="amber">⧗ wants access:</span> ${esc(x)}</span><button class="approve" onclick="this.closest('.row').innerHTML='<span class=green>✓ approved '+'${esc(x)}'+'</span>'">Approve once</button></div>`).join(""):'<div class="mini">No pending requests.</div>';
+  $("#notes").innerHTML=d.notes.map(n=>`<div class="row" style="border-color:#1a251f">📌 ${esc(n)}</div>`).join("");
+}
+// Live: fetch('/api/agent/dashboard'+location.search).then(r=>r.json()).then(render).catch(()=>render(D));
+render(D);
+</script>
+</body>
+</html>

@@ -12,7 +12,7 @@ RUN cd copilot/engine && npm install --omit=optional --no-audit --no-fund
 # App — mirror the repo layout so the server's relative paths resolve
 # (console at ../../index.html, brand at ../../../brand).
 COPY copilot/engine ./copilot/engine
-COPY copilot/index.html copilot/onboarding.html copilot/agent.html ./copilot/
+COPY copilot/index.html copilot/onboarding.html copilot/agent.html copilot/agent-dashboard.html ./copilot/
 COPY brand ./brand
 
 WORKDIR /app/copilot/engine

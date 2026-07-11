@@ -9,6 +9,8 @@ export function newClientState(clientId) {
     killed: false,
     counters: { day: null, approvalsRequested: 0, emailsSent: 0 },
     idempotency: [],                           // keys of actions already fired (double-fire impossible)
+    notes: [],                                 // standing preferences the agent remembers ("always CC the manager")
+    pendingDomains: [],                        // domains a task wanted but that need one-click approval
     createdAt: nowIso(),
   };
 }

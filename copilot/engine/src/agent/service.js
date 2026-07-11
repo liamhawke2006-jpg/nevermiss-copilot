@@ -15,6 +15,7 @@ import { buildReplay, exportSession } from "./replay.js";
 import { makeVerifier } from "./verifier.js";
 import { trustScore } from "./trustscore.js";
 import { weeklyAgentDigest } from "./agentdigest.js";
+import { redTeamReport } from "./redteam.js";
 
 // createAgentService deps:
 //   store    — JSON store (store.js); uses `agentClients` + `agentSessions` collections.
@@ -50,7 +51,9 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
       try { page = await launch(state); }
       catch (e) { return { status: "browser_unavailable", reason: e.message }; } // LIVE-gated until Playwright is wired
       const row = store.insert("agentSessions", { clientId: cid, assignment: prompt, status: "running", startedAt: iso(now()) });
-      const res = await runTask({ state, assignment: prompt, planner: plan, browser, page, caps, taskId: row.id, startMs: now(), now, verifier: verify });
+      const res = await runTask({ state, assignment: prompt, planner: plan, browser, page, caps, taskId: row.id, startMs: now(), now, verifier: verify, memory: state.notes || [] });
+      // c21 — a task that wanted a new domain surfaces it for one-click approval.
+      if (res.status === "parked_domain" && res.domain && !(state.pendingDomains || []).includes(res.domain)) (state.pendingDomains = state.pendingDomains || []).push(res.domain);
       store.update("agentSessions", row.id, { ...res.session, status: res.status, held: res.held || null, blocked: res.blocked || null, injection: res.injection || null });
       persist(state);
       const alerts = await raiseAlerts({ ...res.session, taskId: row.id }, { config, store, notify: alertNotify }); // operator alerts
@@ -78,7 +81,16 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
   function kill(clientId) { const st = stateFor(clientId); engageKill(st); persist(st); closeClient(clientId).catch(() => {}); return { killed: true }; }
   function unkill(clientId) { const st = stateFor(clientId); releaseKill(st); persist(st); return { killed: false }; }
   function killGlobal() { engageGlobalKill(); closeAll().catch(() => {}); return { globalKill: true }; }
-  function allowDomain(clientId, domain) { const st = stateFor(clientId); approveDomain(st, domain); persist(st); return { allowlist: st.allowlist }; }
+  function allowDomain(clientId, domain) {
+    const st = stateFor(clientId); approveDomain(st, domain);
+    const h = hostOf(domain.includes("://") ? domain : `https://${domain}`);
+    st.pendingDomains = (st.pendingDomains || []).filter((d) => d !== h && d !== domain); // c21: clear the pending request
+    persist(st); return { allowlist: st.allowlist, pendingDomains: st.pendingDomains };
+  }
+  const pendingDomains = (clientId) => stateFor(clientId).pendingDomains || [];
+  // c22 — client memory: standing preferences the agent carries into every task.
+  function addNote(clientId, note) { const st = stateFor(clientId); const n = String(note || "").slice(0, 200); if (n) (st.notes = st.notes || []).push(n); persist(st); return { notes: st.notes }; }
+  const notes = (clientId) => stateFor(clientId).notes || [];
 
   function sessions(clientId) { return prune(store.where("agentSessions", (s) => s.clientId === String(clientId))); }
   function session(taskId) { return store.get("agentSessions", Number(taskId)); }
@@ -109,6 +121,26 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
   const preview = (assignment) => previewPlan(assignment); // Plan Preview & Trust Map (no execution)
   const reportCard = (clientId) => trustScore(stats(clientId)); // c11
   const digest = (clientId) => weeklyAgentDigest(sessions(clientId), String(clientId)); // c12
+  // c25 — rough LLM cost estimate (planner + verifier calls). Offline shows the projection.
+  const estCostUsd = (st) => Math.round(((st.autoActions || 0) + (st.approvalsRequested || 0) * 2) * 0.0009 * 1000) / 1000;
+
+  // FLAGSHIP c30 — Trust Dashboard: everything the owner's control room needs, in one payload.
+  function dashboard(clientId) {
+    const st = stats(clientId);
+    return {
+      clientId: String(clientId),
+      trust: trustScore(st),
+      stats: st,
+      digest: weeklyAgentDigest(sessions(clientId), String(clientId)),
+      recent: sessions(clientId).slice(-6).reverse().map((s) => ({ taskId: s.id, assignment: s.assignment, status: s.status, startedAt: s.startedAt, steps: (s.steps || []).length })),
+      alerts: store.where("events", (e) => e.type === "agent_alert").slice(-10).reverse(),
+      redteam: redTeamReport(),
+      allowlist: stateFor(clientId).allowlist,
+      pendingDomains: pendingDomains(clientId),
+      notes: notes(clientId),
+      estCostUsd: estCostUsd(st),
+    };
+  }
 
   // c13 — dry-run a task against saved page observations. No browser, no persistence:
   // uses a disposable copy of the client's allowlist so nothing is mutated.
@@ -122,7 +154,7 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
   const replay = (taskId) => buildReplay(session(taskId) || {});  // HTML timeline
   const exportOne = (taskId) => exportSession(session(taskId) || {}); // portable JSON
 
-  return { assign, approve, deny, kill, unkill, killGlobal, allowDomain, sessions, session, clientView, stats, preview, replay, exportOne, reportCard, digest, simulate, stateFor };
+  return { assign, approve, deny, kill, unkill, killGlobal, allowDomain, pendingDomains, addNote, notes, sessions, session, clientView, stats, preview, replay, exportOne, reportCard, digest, simulate, dashboard, stateFor };
 }
 
 const iso = (ms) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
