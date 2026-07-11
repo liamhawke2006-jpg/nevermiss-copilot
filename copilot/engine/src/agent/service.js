@@ -4,12 +4,13 @@
 // pass fakes. Nothing here relaxes a gate — it orchestrates the gated primitives.
 import { newClientState } from "./state.js";
 import { runTask, performApproved } from "./loop.js";
-import { engageKill, releaseKill, engageGlobalKill, approveDomain, isHalted, DEFAULT_CAPS } from "./guards.js";
+import { engageKill, releaseKill, engageGlobalKill, approveDomain, isHalted, hostOf, DEFAULT_CAPS } from "./guards.js";
 import { prune } from "./audit.js";
 import { makePlanner } from "./planner.js";
 import * as realBrowser from "./browser.js";
 import { makeOpenPage, closeClient, closeAll } from "./pagepool.js";
 import { raiseAlerts } from "./alerts.js";
+import { previewPlan } from "./plan.js";
 
 // createAgentService deps:
 //   store    — JSON store (store.js); uses `agentClients` + `agentSessions` collections.
@@ -78,7 +79,31 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
   function session(taskId) { return store.get("agentSessions", Number(taskId)); }
   function clientView(clientId) { const st = stateFor(clientId); return { clientId: st.clientId, allowlist: st.allowlist, killed: st.killed, counters: st.counters, profileDir: st.profileDir }; }
 
-  return { assign, approve, deny, kill, unkill, killGlobal, allowDomain, sessions, session, clientView, stateFor };
+  // Safety-posture snapshot for a client (drives the trust report card).
+  function stats(clientId) {
+    const ss = store.where("agentSessions", (s) => s.clientId === String(clientId));
+    const steps = ss.flatMap((s) => s.steps || []);
+    const byStatus = {};
+    for (const s of ss) byStatus[s.status] = (byStatus[s.status] || 0) + 1;
+    const st = stateFor(clientId);
+    return {
+      clientId: String(clientId),
+      tasks: ss.length,
+      byStatus,
+      autoActions: steps.filter((x) => x.decision === "auto").length,
+      approvalsRequested: ss.filter((s) => s.status === "parked_approval").length,
+      tier3Blocked: steps.filter((x) => x.decision === "blocked").length,
+      injectionFreezes: ss.filter((s) => s.status === "frozen").length,
+      piiRedactions: steps.filter((x) => x.event === "pii_redacted").length,
+      domainsTouched: [...new Set(steps.map((x) => x.action && x.action.url && hostOf(x.action.url)).filter(Boolean))],
+      allowlist: st.allowlist,
+      killed: st.killed,
+    };
+  }
+
+  const preview = (assignment) => previewPlan(assignment); // Plan Preview & Trust Map (no execution)
+
+  return { assign, approve, deny, kill, unkill, killGlobal, allowDomain, sessions, session, clientView, stats, preview, stateFor };
 }
 
 const iso = (ms) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");

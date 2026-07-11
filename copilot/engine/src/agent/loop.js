@@ -4,6 +4,8 @@
 // path is testable without a live model or a real browser.
 import { classify, TIER } from "./classify.js";
 import { scanInjection, destinationFromContent } from "./injection.js";
+import { shieldPII } from "./pii.js";
+import { explainAction } from "./explain.js";
 import { isDomainAllowed, hostOf, isHalted, canRequestApproval, canSendEmail, recordApproval, recordEmail, idemKey, alreadyFired, markFired, runtimeExceeded, DEFAULT_CAPS } from "./guards.js";
 import { newSession, record } from "./audit.js";
 
@@ -66,8 +68,11 @@ export async function runTask({ state, assignment, planner, browser, page, caps 
       return finish("frozen", { injection: inj });
     }
 
-    // Plan the next action. Page content is passed as DATA only.
-    const action = await planner({ assignment, observation: { url: obs.url, text: obs.text, axtree: obs.axtree }, history: session.steps });
+    // Plan the next action. Page content is passed as DATA only, and PII is
+    // redacted before the model ever sees it.
+    const shield = shieldPII(obs.text);
+    if (shield.redactions) record(session, { event: "pii_redacted", note: `${shield.redactions} PII value(s) hidden from the model`, kinds: shield.kinds });
+    const action = await planner({ assignment, observation: { url: obs.url, text: shield.text, axtree: obs.axtree }, history: session.steps });
     if (!action || action.type === "done") { record(session, { event: "done" }); return finish("done"); }
 
     // Domain allowlist + content-sourced destination (goals come only from the assignment).
@@ -86,13 +91,13 @@ export async function runTask({ state, assignment, planner, browser, page, caps 
     if (g.decision === "halted") { record(session, { event: "halt" }); return finish("halted"); }
     if (g.decision === "blocked") {
       record(session, { action, tier: 3, decision: "blocked", reason: g.reason, screenshot: obs.screenshot });
-      return finish("blocked_handoff", { blocked: { action, reason: g.reason } }); // hand this part to the client
+      return finish("blocked_handoff", { blocked: { action, reason: g.reason, explain: explainAction(action) } }); // hand this part to the client
     }
     if (g.decision === "cap_reached") { record(session, { action, decision: "cap_reached", reason: "daily approval cap" }); return finish("parked_timeout", { cap: true }); }
     if (g.decision === "hold") {
       // Park with the EXACT payload the client will see before anything fires.
       record(session, { action, tier: 2, decision: "hold", reason: g.reason, screenshot: obs.screenshot });
-      return finish("parked_approval", { held: { action, reason: g.reason, screenshot: obs.screenshot } });
+      return finish("parked_approval", { held: { action, reason: g.reason, explain: explainAction(action), screenshot: obs.screenshot } });
     }
     // Tier 1 — run it and record.
     await browser.act(page, action);

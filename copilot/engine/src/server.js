@@ -161,6 +161,8 @@ createServer(async (req, res) => {
     if (p.startsWith("/api/agent/")) {
       const svc = agentFor(tid); if (!svc) return json(res, 404, { error: "unknown tenant" });
       const client = tid || "_legacy";
+      if (req.method === "POST" && p === "/api/agent/preview") return json(res, 200, svc.preview(body.prompt)); // Plan Preview — no execution
+      if (req.method === "GET" && p === "/api/agent/stats") return json(res, 200, svc.stats(client));
       if (req.method === "POST" && p === "/api/agent/assign") return json(res, 200, await svc.assign(client, body.prompt));
       if (req.method === "POST" && p === "/api/agent/approve") return json(res, 200, await svc.approve(client, body.taskId));
       if (req.method === "POST" && p === "/api/agent/deny") return json(res, 200, svc.deny(client, body.taskId, body.reason));

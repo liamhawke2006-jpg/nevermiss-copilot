@@ -87,6 +87,15 @@ h3.sec{font-size:13px;letter-spacing:.04em;color:var(--ink2);margin:2px 0 0}
       <div class="chips" style="margin-top:6px"><span class="muted small">Approved domains:</span><span class="chip">nabis.pro</span><span class="chip">gmail.com</span><span class="chip">quickbooks.intuit.com</span><span class="chip muted">+ approve a new one once</span></div>
     </div>
 
+    <!-- Plan Preview & Trust Map (shown BEFORE a task runs) -->
+    <div class="card" id="planCard" style="display:none;border:1px solid rgba(51,183,204,.4)">
+      <div class="task-h"><div><div class="k" style="color:var(--aqua)">Plan preview · here's exactly what I'll do</div>
+        <h3 class="sec" id="planSummary"></h3></div><span class="status running" id="planMeta"></span></div>
+      <div id="planSteps" style="margin-top:8px"></div>
+      <div class="small muted" style="margin-top:8px">You're approving the <b>plan</b>. I still pause again for the actual send/submit — this just shows where control stays with you.</div>
+      <div class="acts"><button class="ap" onclick="approvePlan()">Approve plan &amp; run →</button><button class="dn" onclick="dismiss('planCard')">Cancel</button></div>
+    </div>
+
     <!-- injection freeze (shown when a task freezes) -->
     <div class="card freeze" id="freezeCard" style="display:none">
       <div class="task-h"><div><div class="k" style="color:var(--danger)">⚠ Task frozen — possible prompt injection</div>
@@ -155,10 +164,41 @@ function stepHTML(s,i){return `<div class="step"><div class="shot">IMG<span clas
   <div class="body"><div class="lb">${s.lb}<span class="tier t${s.tier}">Tier ${s.tier}${s.tier===1?" · auto":s.tier===2?" · hold":" · blocked"}</span></div>
   <div class="meta">${s.meta}</div></div></div>`;}
 
+// Plan Preview & Trust Map — shown BEFORE anything runs (mirrors src/agent/plan.js).
+const PLANS={
+  chase_invoices:{sum:"Read the aging report, draft a reminder per overdue account, and pause before every send.",steps:[["Open the books & read the aging report",1],["Draft a reminder email per account",1],["Send each reminder",2]]},
+  fill_form:{sum:"Fill the form from your business profile and pause before submitting.",steps:[["Open & read the form",1],["Fill it from your profile",1],["Submit the form",2]]},
+  pull_orders:{sum:"Read the customer's recent orders into your notes. Read-only.",steps:[["Open the platform & find the customer",1],["Read their recent orders",1],["Write them into your notes",1]]},
+  research:{sum:"Search the approved sites and return the answer, not tabs. Read-only.",steps:[["Search the approved sites",1],["Extract the answer",1],["Return the answer",1]]},
+  download_reports:{sum:"Download the requested reports and file them.",steps:[["Open the platform",1],["Download the reports",1],["File them in your folder",1]]},
+  update_listing:{sum:"Stage the edited copy and pause before publishing.",steps:[["Open the listing editor",1],["Stage the edited copy",1],["Publish the change",2]]},
+  general:{sum:"General task — I'll do the safe parts and pause before anything leaves the building.",steps:[["Read the page & plan the next step",1],["Do the safe parts (navigate, read, fill)",1],["Pause before anything is sent",2]]},
+};
+function matchPlan(a){a=(a||"").toLowerCase();
+  if(/invoice|overdue|chase/.test(a))return"chase_invoices";
+  if(/fill|form|application/.test(a))return"fill_form";
+  if(/order/.test(a))return"pull_orders";
+  if(/research|compare|look up|find/.test(a))return"research";
+  if(/download|report/.test(a))return"download_reports";
+  if(/menu|listing|copy|publish/.test(a))return"update_listing";
+  return"general";}
+const GATE=[,"auto","pause for your approval","refuse — you do it"];
 function demoAssign(){
-  $("#taskName").textContent=$("#prompt").value||"Chase my overdue invoices";
+  const prompt=$("#prompt").value||"Chase my overdue invoices";
+  const plan=PLANS[matchPlan(prompt)];
+  $("#taskName").textContent=prompt;
+  $("#planSummary").textContent=plan.sum;
+  const pauses=plan.steps.filter(s=>s[1]===2).length, refuses=plan.steps.filter(s=>s[1]===3).length;
+  $("#planMeta").textContent=`${pauses} pause${pauses!==1?"s":""}${refuses?` · ${refuses} refuse`:""}`;
+  $("#planSteps").innerHTML=plan.steps.map((s,i)=>`<div class="step"><div class="shot" style="width:34px;flex:0 0 34px;height:34px">${i+1}</div>
+    <div class="body"><div class="lb">${esc(s[0])}<span class="tier t${s[1]}">${GATE[s[1]]}</span></div></div></div>`).join("");
+  $("#planCard").style.display="block";$("#approveCard").style.display="none";$("#feed").innerHTML="";
+  $("#planCard").scrollIntoView({behavior:"smooth",block:"center"});
+}
+function approvePlan(){
+  $("#planCard").style.display="none";
   $("#taskStatus").className="status running";$("#taskStatus").textContent="Running";
-  $("#feed").innerHTML="";$("#approveCard").style.display="none";
+  $("#feed").innerHTML="";
   let i=0;const t=setInterval(()=>{
     if(i>=DEMO.length){clearInterval(t);park();return;}
     $("#feed").insertAdjacentHTML("beforeend",stepHTML(DEMO[i],i));i++;

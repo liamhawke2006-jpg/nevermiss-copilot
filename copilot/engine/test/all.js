@@ -17,6 +17,7 @@ const suites = [
   ["upgrades   (audit/TTL/cap/redact/idempotent/health)",  "test/upgrades.test.js"],
   ["agent-mode (gates/injection/isolation/killswitch)",    "test/agent-mode.test.js"],
   ["agent-hard (injection-v2/gate-v2/domains/alerts/lock)","test/agent-hardening.test.js"],
+  ["agent-loop (PII shield/explain/stats/plan-preview)",   "test/agent-loop.test.js"],
   ["agent-live (real Chromium — skips until go-live flip)","test/agent-live.test.js"],
 ];
 let failed = 0;
