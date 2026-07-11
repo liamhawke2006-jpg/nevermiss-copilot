@@ -22,17 +22,18 @@ export function openMemory() {
 
 function makeApi(data, persist) {
   const id = () => ++data.seq;
+  const col = (c) => (data[c] = data[c] || []); // lazily init any collection (schema-flexible)
   const api = {
     _data: data,
-    insert(coll, row) { const r = { id: id(), ...row }; data[coll].push(r); persist(); return r; },
+    insert(coll, row) { const r = { id: id(), ...row }; col(coll).push(r); persist(); return r; },
     update(coll, rowId, patch) {
-      const r = data[coll].find((x) => x.id === rowId);
+      const r = col(coll).find((x) => x.id === rowId);
       if (r) { Object.assign(r, patch); persist(); }
       return r;
     },
-    get(coll, rowId) { return data[coll].find((x) => x.id === rowId) || null; },
-    where(coll, pred) { return data[coll].filter(pred); },
-    all(coll) { return data[coll]; },
+    get(coll, rowId) { return col(coll).find((x) => x.id === rowId) || null; },
+    where(coll, pred) { return col(coll).filter(pred); },
+    all(coll) { return col(coll); },
     event(taskId, type, summary, meta = {}) {
       return api.insert("events", { ts: nowIso(), task_id: taskId ?? null, type, summary, meta });
     },

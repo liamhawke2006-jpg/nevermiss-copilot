@@ -10,6 +10,8 @@ import { runTask, guard, performAuto, performApproved } from "../src/agent/loop.
 import { matchRecipe, RECIPES } from "../src/agent/recipes.js";
 import { prune } from "../src/agent/audit.js";
 import { makePlanner, AGENT_SYSTEM_PROMPT } from "../src/agent/planner.js";
+import { createAgentService } from "../src/agent/service.js";
+import { openMemory } from "../src/store.js";
 
 // Fake browser: replays scripted observations, records every act() call.
 function fakeBrowser(observations = [{ url: "https://ok.test", text: "hello", html: "<p>hello</p>" }]) {
@@ -182,6 +184,32 @@ function fakeBrowser(observations = [{ url: "https://ok.test", text: "hello", ht
   const p2 = makePlanner({ offline: false, anthropic: { key: "x" } }, badClient);
   assert.deepEqual(await p2({ assignment: "x", observation: {}, history: [] }), { type: "done" }, "unparseable → done, not a guess");
   console.log("  ✓ live planner — grounded prompt, parses action, fails safe");
+}
+
+// ── SERVICE: assign → park → approve-once → kill → isolation (end to end) ──────
+{
+  const store = openMemory();
+  const acted = [];
+  const browser = { observe: async () => ({ url: "https://ok.test", text: "compose", html: "<div>compose</div>" }), act: async (_p, a) => acted.push(a) };
+  const svc = createAgentService({ store, config: { offline: true }, browser, planner: async () => ({ type: "send_email", to: "client@x.com", subject: "Recap", body: "hi" }), openPage: async () => ({}) });
+
+  svc.allowDomain("acme", "ok.test");
+  const r = await svc.assign("acme", "email the client a recap");
+  assert.equal(r.status, "parked_approval", "service parks the Tier-2 send");
+  assert.equal(acted.length, 0, "nothing sent before approval");
+  assert.equal(svc.sessions("acme").length, 1, "session recorded + retained");
+
+  const ap = await svc.approve("acme", r.taskId);
+  assert.equal(ap.executed, true, "approve fires the parked send");
+  assert.equal(acted.length, 1, "sent exactly once");
+  const ap2 = await svc.approve("acme", r.taskId);
+  assert.equal(ap2.executed, false, "idempotent — no double-send on re-approve");
+
+  svc.kill("acme");
+  assert.equal((await svc.assign("acme", "do more")).status, "halted", "killed client can't run tasks");
+  assert.equal(svc.clientView("beeco").killed, false, "kill is per-client — beeco unaffected");
+  assert.deepEqual(svc.clientView("beeco").allowlist, [], "beeco starts with an empty allowlist (no bleed)");
+  console.log("  ✓ service — assign parks, approve fires once, kill halts, isolation holds");
 }
 
 console.log("✓ agent-mode");

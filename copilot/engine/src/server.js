@@ -21,15 +21,25 @@ import { openTenants, resolveConfig, connections, verifyKey, publicTenant, selfT
 import { gmailAuthUrl, gmailConfigured, exchangeCode, tenantFromState } from "./oauth.js";
 import { auditLog } from "./audit.js";
 import { healthPayload } from "./health.js";
+import { createAgentService } from "./agent/service.js";
 
 const STARTED_MS = Date.now();
 const here = dirname(fileURLToPath(import.meta.url));
 const CONSOLE = join(here, "..", "..", "index.html");
 const ONBOARD = join(here, "..", "..", "onboarding.html");
+const AGENT = join(here, "..", "..", "agent.html");
 const REPO = resolve(join(here, "..", "..", ".."));
 
 const tenants = openTenants();
 const cache = new Map(); // tenantId -> { config, registry, store }
+const agentCache = new Map(); // tenantId -> Agent Mode service (per client)
+function agentFor(tenantId) {
+  const c = ctxFor(tenantId);
+  if (!c) return null;
+  const key = tenantId || "_legacy";
+  if (!agentCache.has(key)) agentCache.set(key, createAgentService({ store: c.store, config: c.config }));
+  return agentCache.get(key);
+}
 function ctxFor(tenantId) {
   if (!tenantId) return { config: base, registry: buildRegistry(base), store: openStore(base.dbPath) }; // legacy single-tenant
   const t = tenants.get(tenantId);
@@ -145,8 +155,26 @@ createServer(async (req, res) => {
     if (req.method === "POST" && p === "/api/approve") { return json(res, 200, await approve(c.store, Number(body.id), { config: c.config, registry: c.registry })); }
     if (req.method === "POST" && p === "/api/deny") { return json(res, 200, deny(c.store, Number(body.id), body.reason)); }
 
+    // ---- Agent Mode (server-side web automation) ----
+    // Browser execution is LIVE-gated: assign returns { status:"browser_unavailable" }
+    // until Playwright is installed + AGENT_BROWSER_LIVE=1. All gates run regardless.
+    if (p.startsWith("/api/agent/")) {
+      const svc = agentFor(tid); if (!svc) return json(res, 404, { error: "unknown tenant" });
+      const client = tid || "_legacy";
+      if (req.method === "POST" && p === "/api/agent/assign") return json(res, 200, await svc.assign(client, body.prompt));
+      if (req.method === "POST" && p === "/api/agent/approve") return json(res, 200, await svc.approve(client, body.taskId));
+      if (req.method === "POST" && p === "/api/agent/deny") return json(res, 200, svc.deny(client, body.taskId, body.reason));
+      if (req.method === "POST" && p === "/api/agent/kill") return json(res, 200, body.global ? svc.killGlobal() : svc.kill(client));
+      if (req.method === "POST" && p === "/api/agent/unkill") return json(res, 200, svc.unkill(client));
+      if (req.method === "POST" && p === "/api/agent/domain") return json(res, 200, svc.allowDomain(client, body.domain));
+      if (req.method === "GET" && p === "/api/agent/sessions") return json(res, 200, { sessions: svc.sessions(client) });
+      if (req.method === "GET" && p === "/api/agent/session") return json(res, 200, svc.session(url.searchParams.get("id")) || { error: "not found" });
+      if (req.method === "GET" && p === "/api/agent/client") return json(res, 200, svc.clientView(client));
+    }
+
     // ---- static ----
     if (req.method === "GET" && (p === "/onboarding.html" || p === "/onboard" || p === "/connect")) return serveFile(res, ONBOARD);
+    if (req.method === "GET" && (p === "/agent" || p === "/agent.html")) return serveFile(res, AGENT);
     if (req.method === "GET" && (p === "/" || p === "/index.html")) return serveFile(res, CONSOLE);
     if (req.method === "GET" && p.startsWith("/brand/") && !p.includes("..")) return serveFile(res, join(REPO, p));
     json(res, 404, { error: "not found" });
