@@ -12,6 +12,9 @@ import { makeOpenPage, closeClient, closeAll } from "./pagepool.js";
 import { raiseAlerts } from "./alerts.js";
 import { previewPlan } from "./plan.js";
 import { buildReplay, exportSession } from "./replay.js";
+import { makeVerifier } from "./verifier.js";
+import { trustScore } from "./trustscore.js";
+import { weeklyAgentDigest } from "./agentdigest.js";
 
 // createAgentService deps:
 //   store    — JSON store (store.js); uses `agentClients` + `agentSessions` collections.
@@ -20,8 +23,9 @@ import { buildReplay, exportSession } from "./replay.js";
 //              module (LIVE-gated). Tests inject a fake.
 //   planner  — planner(ctx)->action. Default: makePlanner(config).
 //   openPage — (state)->page. Default: launch the client's isolated Playwright profile.
-export function createAgentService({ store, config = {}, browser = realBrowser, planner, openPage, caps = DEFAULT_CAPS, alertNotify }) {
+export function createAgentService({ store, config = {}, browser = realBrowser, planner, openPage, caps = DEFAULT_CAPS, alertNotify, verifier }) {
   const plan = planner || makePlanner(config);
+  const verify = verifier || makeVerifier(config); // second-model review of Tier-2 actions
   const open = openPage || makeOpenPage(config); // production: pooled per-client browser
   const inflight = new Set(); // per-client single-flight: one task at a time per client
 
@@ -46,7 +50,7 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
       try { page = await launch(state); }
       catch (e) { return { status: "browser_unavailable", reason: e.message }; } // LIVE-gated until Playwright is wired
       const row = store.insert("agentSessions", { clientId: cid, assignment: prompt, status: "running", startedAt: iso(now()) });
-      const res = await runTask({ state, assignment: prompt, planner: plan, browser, page, caps, taskId: row.id, startMs: now(), now });
+      const res = await runTask({ state, assignment: prompt, planner: plan, browser, page, caps, taskId: row.id, startMs: now(), now, verifier: verify });
       store.update("agentSessions", row.id, { ...res.session, status: res.status, held: res.held || null, blocked: res.blocked || null, injection: res.injection || null });
       persist(state);
       const alerts = await raiseAlerts({ ...res.session, taskId: row.id }, { config, store, notify: alertNotify }); // operator alerts
@@ -103,10 +107,22 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
   }
 
   const preview = (assignment) => previewPlan(assignment); // Plan Preview & Trust Map (no execution)
+  const reportCard = (clientId) => trustScore(stats(clientId)); // c11
+  const digest = (clientId) => weeklyAgentDigest(sessions(clientId), String(clientId)); // c12
+
+  // c13 — dry-run a task against saved page observations. No browser, no persistence:
+  // uses a disposable copy of the client's allowlist so nothing is mutated.
+  async function simulate(clientId, assignment, observations = []) {
+    const real = stateFor(clientId);
+    const sandbox = { ...newClientState(clientId), allowlist: [...(real.allowlist || [])] };
+    let i = 0;
+    const browser = { observe: async () => observations[Math.min(i++, observations.length - 1)] || { url: "", text: "", html: "" }, act: async () => {} };
+    return runTask({ state: sandbox, assignment, planner: plan, browser, page: {}, caps, taskId: 0, startMs: 1, now: () => 2, verifier: verify });
+  }
   const replay = (taskId) => buildReplay(session(taskId) || {});  // HTML timeline
   const exportOne = (taskId) => exportSession(session(taskId) || {}); // portable JSON
 
-  return { assign, approve, deny, kill, unkill, killGlobal, allowDomain, sessions, session, clientView, stats, preview, replay, exportOne, stateFor };
+  return { assign, approve, deny, kill, unkill, killGlobal, allowDomain, sessions, session, clientView, stats, preview, replay, exportOne, reportCard, digest, simulate, stateFor };
 }
 
 const iso = (ms) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");

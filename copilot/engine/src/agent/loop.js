@@ -50,7 +50,7 @@ export async function performApproved(state, page, browser, action, caps = DEFAU
 
 // The full loop. Returns the session (audit) + a terminal status:
 //   done | frozen (injection) | parked_approval | parked_domain | parked_timeout | halted | blocked_handoff
-export async function runTask({ state, assignment, planner, browser, page, caps = DEFAULT_CAPS, taskId = 0, startMs = 0, now = () => Date.now(), maxSteps = 24 }) {
+export async function runTask({ state, assignment, planner, browser, page, caps = DEFAULT_CAPS, taskId = 0, startMs = 0, now = () => Date.now(), maxSteps = 24, verifier = null }) {
   const t0 = startMs || now();
   const session = newSession(state.clientId, taskId, assignment);
   const finish = (status, extra = {}) => { session.status = status; session.endedAt = new Date(now()).toISOString().slice(0, 19).replace("T", " "); return { ...extra, session, status }; };
@@ -95,9 +95,20 @@ export async function runTask({ state, assignment, planner, browser, page, caps 
     }
     if (g.decision === "cap_reached") { record(session, { action, decision: "cap_reached", reason: "daily approval cap" }); return finish("parked_timeout", { cap: true }); }
     if (g.decision === "hold") {
+      // Adversarial verifier (defense in depth): a second model tries to REFUTE this
+      // action before it can even reach the approval card. Refuted → handed to the
+      // client, never offered as a one-tap.
+      if (verifier) {
+        const v = await verifier({ assignment, action });
+        if (v.refuted) {
+          record(session, { action, tier: 2, decision: "verifier_refused", reason: v.reason, screenshot: obs.screenshot });
+          return finish("blocked_handoff", { blocked: { action, reason: `Second-model review flagged this: ${v.reason}`, explain: explainAction(action) } });
+        }
+        record(session, { event: "verifier_ok", note: v.reason });
+      }
       // Park with the EXACT payload the client will see before anything fires.
-      record(session, { action, tier: 2, decision: "hold", reason: g.reason, screenshot: obs.screenshot });
-      return finish("parked_approval", { held: { action, reason: g.reason, explain: explainAction(action), screenshot: obs.screenshot } });
+      record(session, { action, tier: 2, decision: "hold", reason: g.reason, verified: !!verifier, screenshot: obs.screenshot });
+      return finish("parked_approval", { held: { action, reason: g.reason, explain: explainAction(action), verified: !!verifier, screenshot: obs.screenshot } });
     }
     // Tier 1 — run it and record.
     await browser.act(page, action);

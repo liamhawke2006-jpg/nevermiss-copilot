@@ -157,8 +157,8 @@ function fakeBrowser(observations = [{ url: "https://ok.test", text: "hello", ht
   assert.equal(r.held.action.to, "client@x.com", "exact payload surfaced for approval");
   assert.equal(br2.acted.length, 0, "nothing sent before approval");
 
-  // Recipes: the six ship and match plain-English.
-  assert.equal(RECIPES.length, 6);
+  // Recipes ship and match plain-English (6 core + additions).
+  assert.ok(RECIPES.length >= 6);
   assert.equal(matchRecipe("chase my overdue invoices").id, "chase_invoices");
   assert.equal(matchRecipe("update my menu copy on toast").id, "update_listing");
 

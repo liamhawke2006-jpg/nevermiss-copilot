@@ -22,6 +22,7 @@ import { gmailAuthUrl, gmailConfigured, exchangeCode, tenantFromState } from "./
 import { auditLog } from "./audit.js";
 import { healthPayload } from "./health.js";
 import { createAgentService } from "./agent/service.js";
+import { redTeamReport } from "./agent/redteam.js";
 
 const STARTED_MS = Date.now();
 const here = dirname(fileURLToPath(import.meta.url));
@@ -163,6 +164,10 @@ createServer(async (req, res) => {
       const client = tid || "_legacy";
       if (req.method === "POST" && p === "/api/agent/preview") return json(res, 200, svc.preview(body.prompt)); // Plan Preview — no execution
       if (req.method === "GET" && p === "/api/agent/stats") return json(res, 200, svc.stats(client));
+      if (req.method === "GET" && p === "/api/agent/reportcard") return json(res, 200, svc.reportCard(client));
+      if (req.method === "GET" && p === "/api/agent/digest") return json(res, 200, svc.digest(client));
+      if (req.method === "GET" && p === "/api/agent/redteam") return json(res, 200, redTeamReport());
+      if (req.method === "POST" && p === "/api/agent/simulate") return json(res, 200, await svc.simulate(client, body.prompt, body.observations || []));
       if (req.method === "POST" && p === "/api/agent/assign") return json(res, 200, await svc.assign(client, body.prompt));
       if (req.method === "POST" && p === "/api/agent/approve") return json(res, 200, await svc.approve(client, body.taskId));
       if (req.method === "POST" && p === "/api/agent/deny") return json(res, 200, svc.deny(client, body.taskId, body.reason));

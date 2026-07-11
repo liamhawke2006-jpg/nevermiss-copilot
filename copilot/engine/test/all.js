@@ -19,6 +19,7 @@ const suites = [
   ["agent-hard (injection-v2/gate-v2/domains/alerts/lock)","test/agent-hardening.test.js"],
   ["agent-loop (PII shield/explain/stats/plan-preview)",   "test/agent-loop.test.js"],
   ["agent-loop2(allowlist-path/scripts/export/replay)",    "test/agent-loop2.test.js"],
+  ["agent-loop3(verifier/score/digest/simulate/redteam)",  "test/agent-loop3.test.js"],
   ["agent-live (real Chromium — skips until go-live flip)","test/agent-live.test.js"],
 ];
 let failed = 0;

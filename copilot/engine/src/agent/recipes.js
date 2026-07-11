@@ -45,6 +45,20 @@ export const RECIPES = [
     goal: "Stage the edited copy on the platform, screenshot it, and PARK before publish.",
     parksAt: ["publish"],
   },
+  {
+    id: "reply_reviews",
+    label: "Draft replies to reviews",
+    match: /repl(y|ies).*(review|feedback)|respond.*review/i,
+    goal: "Read new reviews, draft a reply to each, and PARK every reply for approval before posting.",
+    parksAt: ["post", "publish"],
+  },
+  {
+    id: "book_appointment",
+    label: "Book / reschedule an appointment",
+    match: /book|schedule|reschedule|appointment|calendar/i,
+    goal: "Find an open slot and fill the booking, then PARK before confirming (calendar invite).",
+    parksAt: ["submit", "calendar_invite"],
+  },
 ];
 
 export function matchRecipe(assignment = "") {
