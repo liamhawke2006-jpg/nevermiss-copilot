@@ -14,11 +14,15 @@ import { config as base } from "./config.js";
 import { openStore } from "./store.js";
 import { buildRegistry } from "./registry.js";
 import { assign, run } from "./engine.js";
-import { approve, deny, pending } from "./approvals.js";
+import { approve, deny, pending, expireStale } from "./approvals.js";
 import { summary, consoleView } from "./results.js";
-import { openTenants, resolveConfig, connections, verifyKey, publicTenant } from "./provision.js";
+import { detailOf } from "./preview.js";
+import { openTenants, resolveConfig, connections, verifyKey, publicTenant, selfTest } from "./provision.js";
 import { gmailAuthUrl, gmailConfigured, exchangeCode, tenantFromState } from "./oauth.js";
+import { auditLog } from "./audit.js";
+import { healthPayload } from "./health.js";
 
+const STARTED_MS = Date.now();
 const here = dirname(fileURLToPath(import.meta.url));
 const CONSOLE = join(here, "..", "..", "index.html");
 const ONBOARD = join(here, "..", "..", "onboarding.html");
@@ -111,6 +115,11 @@ createServer(async (req, res) => {
     // ---- tenant-scoped engine API ----
     const c = ctxFor(tid);
     if (tid && !c) return json(res, 404, { error: "unknown tenant" });
+    // U3 — lazily expire any world-changing action that sat unapproved past the TTL.
+    if (c) expireStale(c.store, c.config.heldTtlMin);
+    if (req.method === "GET" && p === "/api/health") return json(res, 200, healthPayload(c.config, c.store, { startMs: STARTED_MS }));
+    if (req.method === "GET" && p === "/api/audit") return json(res, 200, { audit: auditLog(c.store, { taskId: url.searchParams.get("task") ? Number(url.searchParams.get("task")) : null }) });
+    if (req.method === "GET" && p === "/api/selftest") { const t = tenants.get(tid); return t ? json(res, 200, await selfTest(t)) : json(res, 200, { mode: "legacy", ready: !c.config.offline, checks: {} }); }
     if (req.method === "GET" && p === "/api/console") return json(res, 200, consoleView(c.store));
     if (req.method === "GET" && p === "/api/results") return json(res, 200, summary(c.store));
     if (req.method === "GET" && p === "/api/tasks") return json(res, 200, c.store.all("tasks"));
@@ -129,12 +138,12 @@ createServer(async (req, res) => {
       if (!t) return json(res, 404, { error: "unknown task" });
       const steps = c.store.where("steps", (s) => s.task_id === id).map(stepView);
       const held = c.store.where("held", (h) => h.task_id === id && h.status === "pending")
-        .map((h) => ({ heldId: h.id, tool: h.tool, risk: h.risk, preview: h.preview, why: h.why }));
+        .map((h) => ({ heldId: h.id, tool: h.tool, risk: h.risk, preview: h.preview, why: h.why, detail: detailOf(h.tool, h.args) }));
       const running = t.status === "assigned" || t.status === "running";
       return json(res, 200, { id, status: t.status, running, prompt: t.prompt, steps, held });
     }
     if (req.method === "POST" && p === "/api/approve") { return json(res, 200, await approve(c.store, Number(body.id), { config: c.config, registry: c.registry })); }
-    if (req.method === "POST" && p === "/api/deny") { return json(res, 200, deny(c.store, Number(body.id))); }
+    if (req.method === "POST" && p === "/api/deny") { return json(res, 200, deny(c.store, Number(body.id), body.reason)); }
 
     // ---- static ----
     if (req.method === "GET" && (p === "/onboarding.html" || p === "/onboard" || p === "/connect")) return serveFile(res, ONBOARD);

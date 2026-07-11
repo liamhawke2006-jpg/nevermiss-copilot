@@ -14,6 +14,7 @@ const suites = [
   ["provision  (multi-tenant isolation + connections)",    "test/provision.test.js"],
   ["secrets    (tenant secrets encrypted at rest)",        "test/secrets.test.js"],
   ["oauth      (Gmail connect flow + Gmail send doer)",    "test/oauth.test.js"],
+  ["upgrades   (audit/TTL/cap/redact/idempotent/health)",  "test/upgrades.test.js"],
 ];
 let failed = 0;
 const t0 = Date.now();

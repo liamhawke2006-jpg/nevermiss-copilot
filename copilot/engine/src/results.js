@@ -26,10 +26,16 @@ export function consoleView(store) {
     icon: iconOf(h.tool), text: h.preview, app: appOf(h.tool), status: "pending",
     summary: `${h.why} — held (${h.risk}); needs your approval before it runs.`, heldId: h.id,
   }));
-  const doneItems = doneSteps.map((st) => ({
-    icon: iconOf(st.tool), text: st.why || st.tool, app: appOf(st.tool), status: "done",
-    summary: st.result && st.result.simulated ? "Ran (simulated in offline mode)." : "Done.",
-  }));
+  const doneItems = doneSteps.map((st) => {
+    const simulated = !!(st.result && st.result.simulated);
+    return {
+      icon: iconOf(st.tool), text: st.why || st.tool, app: appOf(st.tool),
+      status: "done", simulated,
+      summary: simulated
+        ? "Simulated — demo mode; nothing actually sent. Switch this tenant to Live to send for real."
+        : "Done.",
+    };
+  });
   return {
     hoursSaved: s.hoursSaved, delta: 0, tasksDone: s.tasksDone, tasksDelta: 0,
     activeEmployees: 1, pendingApprovals: s.pending,

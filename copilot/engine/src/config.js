@@ -47,4 +47,10 @@ export const config = {
   // Invite-only signup gate. If set, POST /api/onboard requires a matching code.
   // Leave unset for open signup (local/dev); set SIGNUP_CODE in production.
   signupCode: process.env.SIGNUP_CODE || "",
+
+  // Guardrails. maxSendsPerDay caps outbound sends/posts/payments per day (0 =
+  // unlimited). heldTtlMin auto-expires an unapproved world-changing action after
+  // N minutes (0 = never). Both default off to preserve existing behavior.
+  maxSendsPerDay: Number(process.env.COPILOT_MAX_SENDS_PER_DAY || 0),
+  heldTtlMin: Number(process.env.COPILOT_HELD_TTL_MIN || 0),
 };

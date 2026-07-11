@@ -60,6 +60,29 @@ export function resolveConfig(tenant) {
     sendgrid: { key: s.sendgridKey || base.sendgrid.key, from: s.mailFrom || base.sendgrid.from },
     gmail: { refresh: s.gmailRefresh || "", clientId: base.google.clientId, clientSecret: base.google.clientSecret, redirectBase: base.google.redirectBase },
     browserHeadless: true,
+    maxSendsPerDay: base.maxSendsPerDay || 0,
+    heldTtlMin: base.heldTtlMin || 0,
+  };
+}
+
+// U9 — connection self-test. Verifies the brain + email are actually usable before
+// a tenant assigns real work, so "nothing happens on approve" is diagnosable up front.
+export async function selfTest(tenant) {
+  const cfg = resolveConfig(tenant);
+  const s = open(tenant.secrets);
+  const live = !cfg.offline;
+  const brain = await verifyKey("anthropic", cfg.anthropic.key, { offline: true }); // format-only, no spend
+  const email = s.gmailRefresh
+    ? { ok: true, detail: "gmail connected" }
+    : await verifyKey("sendgrid", cfg.sendgrid.key, { offline: !live });
+  return {
+    mode: tenant.mode,
+    ready: brain.ok && (email.ok || cfg.offline),
+    checks: {
+      brain: { ...brain, note: brain.ok ? "" : "add an Anthropic key" },
+      email: { ...email, note: email.ok ? "" : "connect Gmail or add a SendGrid key + verified sender" },
+      sendReal: live ? "live — approvals actually send" : "demo — approvals are simulated (nothing sent)",
+    },
   };
 }
 
