@@ -14,15 +14,29 @@ export function hostOf(url) {
   try { return new URL(String(url)).hostname.replace(/^www\./, "").toLowerCase(); }
   catch { return String(url || "").toLowerCase(); }
 }
-// A domain is allowed if the client approved it or a parent of it (nabis.pro
-// covers app.nabis.pro). The list starts empty — nothing is reachable by default.
+// A url is allowed if the client approved its host (or a parent host), AND — for a
+// PATH-SCOPED entry like "nabis.pro/orders" — its path is under that prefix. The
+// list starts empty; nothing is reachable by default. Path scoping shrinks the
+// blast radius: approve "nabis.pro/orders" and the agent can't wander to billing.
 export function isDomainAllowed(state, url) {
-  const h = hostOf(url);
-  return (state.allowlist || []).some((d) => h === d || h.endsWith("." + d));
+  let u; try { u = new URL(String(url)); } catch { return false; }
+  const host = u.hostname.replace(/^www\./, "").toLowerCase();
+  const path = u.pathname || "/";
+  return (state.allowlist || []).some((entry) => {
+    const slash = entry.indexOf("/");
+    const dh = (slash === -1 ? entry : entry.slice(0, slash)).toLowerCase();
+    const dpath = slash === -1 ? "" : entry.slice(slash).replace(/\/$/, "");
+    const hostOk = host === dh || host.endsWith("." + dh);
+    if (!hostOk) return false;
+    return !dpath || path === dpath || path.startsWith(dpath + "/");
+  });
 }
 export function approveDomain(state, domain) {
-  const d = hostOf(domain.includes("://") ? domain : `https://${domain}`);
-  if (d && !state.allowlist.includes(d)) state.allowlist.push(d);
+  let u; try { u = new URL(domain.includes("://") ? domain : `https://${domain}`); } catch { return state.allowlist; }
+  const host = u.hostname.replace(/^www\./, "").toLowerCase();
+  const path = u.pathname && u.pathname !== "/" ? u.pathname.replace(/\/$/, "") : "";
+  const entry = path ? `${host}${path}` : host;
+  if (entry && !state.allowlist.includes(entry)) state.allowlist.push(entry);
   return state.allowlist;
 }
 

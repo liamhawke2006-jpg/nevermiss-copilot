@@ -50,3 +50,23 @@ export const RECIPES = [
 export function matchRecipe(assignment = "") {
   return RECIPES.find((r) => r.match.test(String(assignment))) || null;
 }
+
+// Deterministic step scripts for the core jobs — the mechanical path doesn't need
+// the LLM (cheaper, faster, reproducible). The loop still gates every action; the
+// LLM is only needed for judgement steps (what to write). Ends with {type:"done"}.
+const SCRIPTS = {
+  pull_orders: [{ type: "extract", why: "read recent orders" }, { type: "fill", selector: "notes", why: "write to notes" }, { type: "done" }],
+  research: [{ type: "search", why: "search approved sites" }, { type: "extract", why: "extract the answer" }, { type: "done" }],
+  download_reports: [{ type: "download", selector: "#report", why: "download the report" }, { type: "done" }],
+  fill_form: [{ type: "fill", selector: "form", why: "fill from profile" }, { type: "submit", selector: "#submit", why: "submit (parks for approval)" }, { type: "done" }],
+};
+
+// A planner that follows a recipe's script deterministically (falls through to a
+// provided LLM planner for recipes without a script, or for judgement steps).
+export function scriptedPlanner(assignment, fallback) {
+  const recipe = matchRecipe(assignment);
+  const script = recipe && SCRIPTS[recipe.id];
+  if (!script) return fallback;
+  let i = 0;
+  return async (ctx) => (i < script.length ? script[i++] : (fallback ? fallback(ctx) : { type: "done" }));
+}

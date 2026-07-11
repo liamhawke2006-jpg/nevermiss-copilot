@@ -172,6 +172,8 @@ createServer(async (req, res) => {
       if (req.method === "GET" && p === "/api/agent/alerts") return json(res, 200, { alerts: c.store.where("events", (e) => e.type === "agent_alert").slice(-50).reverse() });
       if (req.method === "GET" && p === "/api/agent/sessions") return json(res, 200, { sessions: svc.sessions(client) });
       if (req.method === "GET" && p === "/api/agent/session") return json(res, 200, svc.session(url.searchParams.get("id")) || { error: "not found" });
+      if (req.method === "GET" && p === "/api/agent/replay") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); return res.end(svc.replay(url.searchParams.get("id"))); }
+      if (req.method === "GET" && p === "/api/agent/export") { const e = svc.exportOne(url.searchParams.get("id")); res.writeHead(200, { "content-type": "application/json", "content-disposition": `attachment; filename="${e.filename}"` }); return res.end(e.json); }
       if (req.method === "GET" && p === "/api/agent/client") return json(res, 200, svc.clientView(client));
     }
 

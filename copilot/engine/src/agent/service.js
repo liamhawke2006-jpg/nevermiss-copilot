@@ -11,6 +11,7 @@ import * as realBrowser from "./browser.js";
 import { makeOpenPage, closeClient, closeAll } from "./pagepool.js";
 import { raiseAlerts } from "./alerts.js";
 import { previewPlan } from "./plan.js";
+import { buildReplay, exportSession } from "./replay.js";
 
 // createAgentService deps:
 //   store    — JSON store (store.js); uses `agentClients` + `agentSessions` collections.
@@ -102,8 +103,10 @@ export function createAgentService({ store, config = {}, browser = realBrowser, 
   }
 
   const preview = (assignment) => previewPlan(assignment); // Plan Preview & Trust Map (no execution)
+  const replay = (taskId) => buildReplay(session(taskId) || {});  // HTML timeline
+  const exportOne = (taskId) => exportSession(session(taskId) || {}); // portable JSON
 
-  return { assign, approve, deny, kill, unkill, killGlobal, allowDomain, sessions, session, clientView, stats, preview, stateFor };
+  return { assign, approve, deny, kill, unkill, killGlobal, allowDomain, sessions, session, clientView, stats, preview, replay, exportOne, stateFor };
 }
 
 const iso = (ms) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
